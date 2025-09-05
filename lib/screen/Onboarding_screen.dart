@@ -7,31 +7,90 @@ class OnboardingScreen extends StatelessWidget {
   OnboardingScreen({super.key});
 
   final List<PageViewModel> pages = [
+    
     PageViewModel(
-      title: "Welcome to MyApp",
-      body: "This is a simple app to demonstrate onboarding screens.",
-       image: Align(
-        alignment: Alignment.bottomCenter,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(50),
-        child: Image.asset(
-          "lib/gifs/backpack.gif",
-          height: 200,
-          fit: BoxFit.cover,
-        ),
+      titleWidget: const SizedBox.shrink(), // ไม่ใช้ title ปกติ
+      bodyWidget: Column(
+        mainAxisAlignment: MainAxisAlignment.center, // จัดกลางจอ
+        children: [
+          // รูปเลื่อนลงมากลางจอ
+          const SizedBox(height: 180),
+          Image.asset(
+            "lib/images/mountain.png",
+            height: 300,
+          ),
+          const SizedBox(height: 20), // เว้นระยะ
+          const Text(
+            "Welcome to Tarvel App",
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "Discover new places and plan your trips with ease.",
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+       
+            PageViewModel(
+      titleWidget: const SizedBox.shrink(), // ไม่ใช้ title ปกติ
+      bodyWidget: Column(
+        mainAxisAlignment: MainAxisAlignment.center, // จัดกลางจอ
+        children: [
+          // รูปเลื่อนลงมากลางจอ
+          const SizedBox(height: 180),
+          Image.asset(
+            "lib/images/maps.png",
+            height: 300,
+          ),
+          const SizedBox(height: 20), // เว้นระยะ
+          const Text(
+            "point hiking",
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "Hiking spots and mountains in Thailand.",
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     ),
 
-    ),
+
     PageViewModel(
-      title: "Stay Organized",
-      body: "Keep track of your tasks and stay organized with our app.",
-      image: Center(child: Image.asset("assets/images/onboarding2.png", height: 175)),
-    ),
-    PageViewModel(
-      title: "Get Started",
-      body: "Let's get started! Sign up or log in to continue.",
-      image: Center(child: Image.asset("assets/images/onboarding3.png", height: 175)),
+      titleWidget: const SizedBox.shrink(), // ไม่ใช้ title ปกติ
+      bodyWidget: Column(
+        mainAxisAlignment: MainAxisAlignment.center, // จัดกลางจอ
+        children: [
+          // รูปเลื่อนลงมากลางจอ
+          const SizedBox(height: 180),
+          Image.asset(
+            "lib/images/humans.png",
+            height: 300,
+          ),
+          const SizedBox(height: 80), // เว้นระยะ
+          const Text(
+            "Ready to pack your bags",
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "Pack your bags and go into nature.",
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     ),
   ];
 
