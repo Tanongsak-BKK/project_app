@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:project_app/screen/login_screen.dart';
-import 'package:project_app/screen/signup_screen.dart';
-import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:project_app/screen/home_screen.dart';
+import 'package:project_app/screen/map_screen_vector.dart';
+import 'package:project_app/screen/profile_screen.dart';
+import 'package:project_app/screen/listuserlocation_screen.dart';
 
 class NavbarScreen extends StatefulWidget {
   const NavbarScreen({super.key});
@@ -11,47 +12,99 @@ class NavbarScreen extends StatefulWidget {
 }
 
 class _NavbarScreenState extends State<NavbarScreen> {
-  int _selectedIndex = 0;
+  int _index = 0;
 
-  // ใช้ IndexedStack เพื่อคง state ของแต่ละหน้า
-  final List<Widget> _pages = const [
-    LoginScreen(),
-    SignupScreen(),
+  final _pages = const [
+    HomeScreen(),
+    MapScreenVector(),
+    ListUserLocationScreen(),
+    ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color.fromARGB(255, 255, 255, 255),
-    child:SafeArea(
-      top: false,
-      left: false,
-      right: false,
-    
-    child:Scaffold(
-      // selectedIndex: _selectedIndex,
-      body: _pages[_selectedIndex],
-      // navigationBar: BottomNavigationBar(
-      //   currentIndex: _selectedIndex,
-      bottomNavigationBar: CurvedNavigationBar(
-        backgroundColor: const Color.fromARGB(255, 19, 238, 154),
-        
-        /*onTap: (value) {
-          setState(() {
-            _selectedIndex = value;
-          });
-        },*/
-        
-        items:   [
-        Icon(Icons.payment, size: 30),
-        Icon(Icons.search, size: 30),
-        Icon(Icons.home_outlined, size: 30),
-        Icon(Icons.person, size: 30),
-        Icon(Icons.settings, size: 30),
-      ],
-    ),
-    ),
-    ),
+    return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+      body: SafeArea(
+        bottom: false,
+        child: IndexedStack(
+          index: _index,
+          children: _pages,
+        ),
+      ),
+      bottomNavigationBar: _BottomPillNav(
+        index: _index,
+        onChanged: (i) => setState(() => _index = i),
+      ),
     );
   }
 }
+
+class _BottomPillNav extends StatelessWidget {
+  const _BottomPillNav({required this.index, required this.onChanged});
+  final int index;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Container(
+          height: 70,
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _NavIcon(
+                icon: Icons.home_filled,
+                active: index == 0,
+                onTap: () => onChanged(0),
+              ),
+              _NavIcon(
+                icon: Icons.grid_view_rounded,
+                active: index == 1,
+                onTap: () => onChanged(1),
+              ),
+              _NavIcon(
+                icon: Icons.favorite_border,
+                active: index == 2,
+                onTap: () => onChanged(2),
+              ),
+              _NavIcon(
+                icon: Icons.person,
+                active: index == 3,
+                onTap: () => onChanged(3),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavIcon extends StatelessWidget {
+  const _NavIcon({required this.icon, required this.active, required this.onTap});
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkResponse(
+      onTap: onTap,
+      radius: 28,
+      child: Icon(
+        icon,
+        color: active ? Colors.white : Colors.white70,
+        size: 26,
+      ),
+    );
+  }
+}
+
+

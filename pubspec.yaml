@@ -43,6 +43,9 @@ dependencies:
   google_maps_flutter: ^2.13.1
   location: ^8.0.1
   flutter_svg: ^2.2.1
+  path_drawing: ^1.0.1
+  xml: ^6.5.0
+  image_picker: ^1.0.7
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +73,7 @@ flutter:
   assets:
      - lib/images/
      - lib/gifs/
+     - lib/maps/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

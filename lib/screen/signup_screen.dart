@@ -17,6 +17,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool _obscure1 = true;
   bool _obscure2 = true;
+  bool _agreeTos = false;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -30,14 +32,81 @@ class _SignupScreenState extends State<SignupScreen> {
   InputDecoration _inputDec({
     required String hint,
     required IconData icon,
+    Widget? suffix,
   }) {
     return InputDecoration(
       border: InputBorder.none,
       contentPadding: const EdgeInsets.only(top: 14.0),
       prefixIcon: Icon(icon, color: const Color.fromARGB(255, 3, 136, 154)),
       hintText: hint,
+      suffixIcon: suffix,
       hintStyle: const TextStyle(color: Colors.black38, fontFamily: 'OpenSans'),
     );
+  }
+
+  Future<void> _onEmailSignup() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_agreeTos) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณายอมรับข้อกำหนดการใช้งาน')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      // TODO: เชื่อมต่อ API / Firebase สมัครสมาชิกจริง
+      await Future.delayed(const Duration(milliseconds: 900));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signed up successfully (mock)')),
+      );
+      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign up failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signUpWithGoogle() async {
+    setState(() => _loading = true);
+    try {
+      // TODO: Firebase Auth + Google Sign-In หรือ OAuth ตามแบ็กเอนด์คุณ
+      await Future.delayed(const Duration(milliseconds: 900));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signed up with Google (mock)')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Google sign up failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+  Future<void> _signUpWithGithub() async {
+    setState(() => _loading = true);
+    try {
+      // TODO: GitHub OAuth (เช่นผ่าน Firebase Auth หรือเซิร์ฟเวอร์ของคุณ)
+      await Future.delayed(const Duration(milliseconds: 900));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signed up with GitHub (mock)')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('GitHub sign up failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -89,7 +158,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       controller: _usernameCtrl,
                       textInputAction: TextInputAction.next,
                       decoration: _inputDec(hint: 'Enter your Username', icon: Icons.person),
-                      validator: (v) => (v == null || v.isEmpty) ? 'Please enter username' : null,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Please enter username'
+                          : (v.trim().length < 3 ? 'Username must be at least 3 chars' : null),
                     ),
                   ),
 
@@ -103,8 +174,13 @@ class _SignupScreenState extends State<SignupScreen> {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       decoration: _inputDec(hint: 'Enter your Email', icon: Icons.email),
-                      validator: (v) =>
-                          (v == null || !v.contains('@')) ? 'Invalid email' : null,
+                      validator: (v) {
+                        final value = v?.trim() ?? '';
+                        if (value.isEmpty) return 'Please enter email';
+                        final emailRegex = RegExp(r'^.+@.+\..+$');
+                        if (!emailRegex.hasMatch(value)) return 'Invalid email';
+                        return null;
+                      },
                     ),
                   ),
 
@@ -122,8 +198,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           onPressed: () => setState(() => _obscure1 = !_obscure1),
                         ),
                       ),
-                      validator: (v) =>
-                          (v == null || v.length < 6) ? 'Password too short' : null,
+                      validator: (v) => (v == null || v.length < 6)
+                          ? 'Password must be at least 6 chars'
+                          : null,
                     ),
                   ),
 
@@ -136,32 +213,47 @@ class _SignupScreenState extends State<SignupScreen> {
                       controller: _confirmCtrl,
                       obscureText: _obscure2,
                       decoration: _inputDec(
-                              hint: 'Re-enter your Password', icon: Icons.lock_outline)
-                          .copyWith(
+                        hint: 'Re-enter your Password',
+                        icon: Icons.lock_outline,
+                      ).copyWith(
                         suffixIcon: IconButton(
                           icon: Icon(_obscure2 ? Icons.visibility : Icons.visibility_off),
                           onPressed: () => setState(() => _obscure2 = !_obscure2),
                         ),
                       ),
-                      validator: (v) =>
-                          (v != _passwordCtrl.text) ? 'Passwords do not match' : null,
+                      validator: (v) => (v != _passwordCtrl.text)
+                          ? 'Passwords do not match'
+                          : null,
                     ),
                   ),
 
-                  const SizedBox(height: 20.0),
+                  const SizedBox(height: 10.0),
+
+                  // Agree TOS
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _agreeTos,
+                        onChanged: (v) => setState(() => _agreeTos = v ?? false),
+                        activeColor: Colors.white,
+                        checkColor: const Color.fromARGB(255, 0, 71, 154),
+                      ),
+                      const Expanded(
+                        child: Text(
+                          'I agree to the Terms of Service and Privacy Policy',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10.0),
 
                   // Sign up button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        if (_formKey.currentState?.validate() ?? false) {
-                          // TODO: call API / Firebase Signup
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Signing up...')),
-                          );
-                        }
-                      },
+                      onPressed: _loading ? null : _onEmailSignup,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color.fromARGB(255, 0, 71, 154),
                         padding: const EdgeInsets.all(15.0),
@@ -169,15 +261,85 @@ class _SignupScreenState extends State<SignupScreen> {
                           borderRadius: BorderRadius.circular(30.0),
                         ),
                       ),
-                      child: const Text(
-                        'SIGN UP',
-                        style: TextStyle(
-                          color: Colors.white,
-                          letterSpacing: 1.5,
-                          fontSize: 18.0,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'OpenSans',
-                        ),
+                      child: _loading
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                              ),
+                            )
+                          : const Text(
+                              'SIGN UP',
+                              style: TextStyle(
+                                color: Colors.white,
+                                letterSpacing: 1.5,
+                                fontSize: 18.0,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'OpenSans',
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  // Divider
+                  Row(
+                    children: const [
+                      Expanded(child: Divider(color: Colors.white70)),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 10.0),
+                        child: Text('or sign up with', style: TextStyle(color: Colors.white70)),
+                      ),
+                      Expanded(child: Divider(color: Colors.white70)),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Third-party sign up
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _SsoButton(
+                        label: 'Google',
+                        icon: Icons.g_mobiledata,
+                        onTap: _loading ? null : _signUpWithGoogle,
+                        background: Colors.white,
+                        foreground: Colors.black87,
+                      ),
+                      _SsoButton(
+                        label: 'GitHub',
+                        icon: Icons.code,
+                        onTap: _loading ? null : _signUpWithGithub,
+                        background: Colors.black,
+                        foreground: Colors.white,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24.0),
+
+                  // ไปหน้า Login
+                  TextButton(
+                    onPressed: _loading
+                        ? null
+                        : () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (_) => const LoginScreen()),
+                            );
+                          },
+                    child: const Text(
+                      'Already have an account? Sign In',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'OpenSans',
+                        fontSize: 14.0,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -186,7 +348,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           ),
 
-          // Back button (ไปหน้า Login)
+          // Back button (กลับไป Login)
           SafeArea(
             child: IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -240,6 +402,41 @@ class _FieldBox extends StatelessWidget {
         ],
       ),
       child: child,
+    );
+  }
+}
+
+class _SsoButton extends StatelessWidget {
+  const _SsoButton({
+    required this.label,
+    required this.icon,
+    this.onTap,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: background,
+          foregroundColor: foreground,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 2,
+        ),
+      ),
     );
   }
 }
