@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
+
 import 'package:project_app/screen/home_screen.dart';
-import 'package:project_app/screen/map_screen_vector.dart';
-import 'package:project_app/screen/profile_screen.dart';
-import 'package:project_app/screen/listuserlocation_screen.dart';
 
 class NavbarScreen extends StatefulWidget {
   const NavbarScreen({super.key});
@@ -16,9 +14,10 @@ class _NavbarScreenState extends State<NavbarScreen> {
 
   final _pages = const [
     HomeScreen(),
-    MapScreenVector(),
-    ListUserLocationScreen(),
-    ProfileScreen(),
+    Center(child: Text('Search')),
+    Center(child: Text('Favorite')),
+    Center(child: Text('Profile')),
+   
   ];
 
   @override
@@ -50,12 +49,8 @@ class _BottomPillNav extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Container(
+        child: SizedBox(
           height: 70,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(28),
-          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -100,7 +95,7 @@ class _NavIcon extends StatelessWidget {
       radius: 28,
       child: Icon(
         icon,
-        color: active ? Colors.white : Colors.white70,
+        color: active ? const Color.fromARGB(255, 0, 0, 0) : const Color.fromARGB(179, 0, 0, 0),
         size: 26,
       ),
     );
