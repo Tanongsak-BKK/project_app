@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:project_app/screen/addcard_screen.dart';
+import 'package:project_app/screen/history_screen.dart';
 
 import 'package:project_app/screen/home_screen.dart';
+import 'package:project_app/screen/profile_screen.dart';
 
 class NavbarScreen extends StatefulWidget {
   const NavbarScreen({super.key});
@@ -14,9 +17,9 @@ class _NavbarScreenState extends State<NavbarScreen> {
 
   final _pages = const [
     HomeScreen(),
-    Center(child: Text('Search')),
-    Center(child: Text('Favorite')),
-    Center(child: Text('Profile')),
+    AddCardScreen(),
+    HistoryScreen(),
+    ProfileScreen(),
    
   ];
 

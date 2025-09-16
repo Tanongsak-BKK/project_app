@@ -1,10 +1,16 @@
-// lib/screen/home_screen.dart 
+// lib/screen/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:project_app/model/place.dart'; // ต้องมี enum Region และ class Place
 import 'package:project_app/provider/place_provider.dart';
 import 'package:project_app/screen/detail_screen.dart';
+
+/* ---------------------- Top-level constants ---------------------- */
+// ย้ายออกมาระดับไฟล์เพื่อให้ใช้งานได้ใน const context ทุกที่อย่างปลอดภัย
+const kCard = Color(0xFF151517);
+const kField = Color(0xFF1A1B1F);
+const kAccent = Color(0xFF2F80ED);
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // โหลดข้อมูลครั้งแรก
     Future.microtask(() => context.read<PlaceProvider>().loadPlaces());
   }
 
@@ -28,10 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchCtrl.dispose();
     super.dispose();
   }
-
-  static const _card = Color(0xFF151517);
-  static const _field = Color(0xFF1A1B1F);
-  static const _accent = Color(0xFF2F80ED);
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: SafeArea(
           child: DefaultTabController(
-            length: 5, // ← มี 5 แท็บ: ทั้งหมด + 4 ภูมิภาค
+            length: 5, // ทั้งหมด + 4 ภูมิภาค
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
@@ -95,18 +98,27 @@ class _HomeScreenState extends State<HomeScreen> {
                       hintText: "ค้นหาชื่อสถานที่…",
                       hintStyle: const TextStyle(color: Colors.white54),
                       filled: true,
-                      fillColor: _field,
-                      prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                      fillColor: kField,
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Colors.white70,
+                      ),
                       suffixIcon: (_query.isEmpty)
                           ? null
                           : IconButton(
-                              icon: const Icon(Icons.close, color: Colors.white70),
+                              icon: const Icon(
+                                Icons.close,
+                                color: Colors.white70,
+                              ),
                               onPressed: () {
                                 _searchCtrl.clear();
                                 setState(() => _query = '');
                               },
                             ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 14,
+                        horizontal: 12,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
@@ -127,23 +139,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: prov.isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : prov.error != null
-                            ? Center(
-                                child: Text(
-                                  prov.error!,
-                                  style: const TextStyle(color: Colors.white70),
-                                ),
-                              )
-                            : TabBarView(
-                                physics: const BouncingScrollPhysics(),
-                                children: [
-                                  // ← เพิ่มแท็บ "ทั้งหมด" หน้าแรก
-                                  _AllTab(query: _query),
-                                  _RegionTab(region: Region.north, query: _query),
-                                  _RegionTab(region: Region.south, query: _query),
-                                  _RegionTab(region: Region.east,  query: _query),
-                                  _RegionTab(region: Region.west,  query: _query),
-                                ],
-                              ),
+                        ? Center(
+                            child: Text(
+                              prov.error!,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          )
+                        : TabBarView(
+                            physics: const BouncingScrollPhysics(),
+                            children: [
+                              _AllTab(query: _query), // Pass query here
+                              _RegionTab(region: Region.north, query: _query),
+                              _RegionTab(region: Region.south, query: _query),
+                              _RegionTab(region: Region.east, query: _query),
+                              _RegionTab(region: Region.west, query: _query),
+                            ],
+                          ),
                   ),
                 ],
               ),
@@ -162,19 +173,19 @@ class _CategoryTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TabBar(
+    return const TabBar(
       isScrollable: true,
       dividerColor: Colors.transparent,
       indicatorSize: TabBarIndicatorSize.label,
       labelColor: Colors.white,
       unselectedLabelColor: Colors.white60,
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-      indicator: const UnderlineTabIndicator(
-        borderSide: BorderSide(width: 3, color: _HomeScreenState._accent),
+      labelStyle: TextStyle(fontWeight: FontWeight.w700),
+      indicator: UnderlineTabIndicator(
+        borderSide: BorderSide(width: 3, color: kAccent),
         insets: EdgeInsets.symmetric(horizontal: 8),
       ),
-      tabs: const [
-        Tab(text: 'ทั้งหมด'), // ← เพิ่มแท็บรวมทั้งหมด
+      tabs: [
+        Tab(text: 'ทั้งหมด'),
         Tab(text: 'เหนือ'),
         Tab(text: 'ใต้'),
         Tab(text: 'ตะวันออก'),
@@ -188,8 +199,8 @@ class _CategoryTabs extends StatelessWidget {
 
 class _RegionTab extends StatelessWidget {
   final Region region;
-  final String query;
-  const _RegionTab({required this.region, required this.query});
+  final String? query;
+  const _RegionTab({required this.region, this.query});
 
   @override
   Widget build(BuildContext context) {
@@ -200,16 +211,16 @@ class _RegionTab extends StatelessWidget {
       (p) => p.bookmarkedByRegion(region),
     );
 
-    final q = query.trim().toLowerCase();
+    final q = (query ?? '').trim().toLowerCase();
     bool matches(Place p) => q.isEmpty || p.title.toLowerCase().contains(q);
 
     final items = rawItems.where(matches).toList();
-    final favs  = rawFavs.where(matches).toList();
+    final favs = rawFavs.where(matches).toList();
 
     if (items.isEmpty && favs.isEmpty) {
       return Center(
         child: Text(
-          q.isEmpty ? 'ยังไม่มีข้อมูลในหมวดนี้' : 'ไม่พบผลลัพธ์สำหรับ “$query”',
+          q.isEmpty ? 'ยังไม่มีข้อมูลในหมวดนี้' : 'ไม่พบผลลัพธ์สำหรับ “$q”',
           style: const TextStyle(color: Colors.white70),
         ),
       );
@@ -239,8 +250,14 @@ class _RegionTab extends StatelessWidget {
           const SizedBox(height: 16),
           const Row(
             children: [
-              Text("Popular",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+              Text(
+                "Popular",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
               Spacer(),
             ],
           ),
@@ -274,23 +291,23 @@ class _RegionTab extends StatelessWidget {
 /* ----------------------- All Tab (new) ----------------------- */
 
 class _AllTab extends StatelessWidget {
-  final String query;
-  const _AllTab({required this.query});
+  final String? query;
+  const _AllTab({this.query});
 
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<PlaceProvider>();
-    final q = query.trim().toLowerCase();
+    final q = (query ?? '').trim().toLowerCase();
 
     bool matches(Place p) => q.isEmpty || p.title.toLowerCase().contains(q);
 
     final items = prov.places.where(matches).toList();
-    final favs  = prov.bookmarked().where(matches).toList();
+    final favs = prov.bookmarked().where(matches).toList();
 
     if (items.isEmpty && favs.isEmpty) {
       return Center(
         child: Text(
-          q.isEmpty ? 'ยังไม่มีข้อมูล' : 'ไม่พบผลลัพธ์สำหรับ “$query”',
+          q.isEmpty ? 'ยังไม่มีข้อมูล' : 'ไม่พบผลลัพธ์สำหรับ “$q”',
           style: const TextStyle(color: Colors.white70),
         ),
       );
@@ -320,8 +337,14 @@ class _AllTab extends StatelessWidget {
           const SizedBox(height: 16),
           const Row(
             children: [
-              Text("Popular",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+              Text(
+                "Popular",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
               Spacer(),
             ],
           ),
@@ -375,7 +398,10 @@ class _PlaceCard extends StatelessWidget {
               errorBuilder: (_, __, ___) => Container(
                 color: Colors.black26,
                 alignment: Alignment.center,
-                child: const Icon(Icons.image_not_supported, color: Colors.white54),
+                child: const Icon(
+                  Icons.image_not_supported,
+                  color: Colors.white54,
+                ),
               ),
             ),
           ),
@@ -385,8 +411,13 @@ class _PlaceCard extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.transparent, Colors.black54],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.transparent,
+                      Colors.black54,
+                    ],
                   ),
                 ),
               ),
@@ -394,7 +425,9 @@ class _PlaceCard extends StatelessWidget {
           ),
           // ข้อความ
           Positioned(
-            left: 12, right: 12, bottom: 12,
+            left: 12,
+            right: 12,
+            bottom: 12,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -402,9 +435,14 @@ class _PlaceCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   place.title,
-                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16, height: 1.15),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    height: 1.15,
+                  ),
                 ),
               ],
             ),
@@ -415,20 +453,30 @@ class _PlaceCard extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => DetailScreen(place: place))),
+                  context,
+                  MaterialPageRoute(builder: (_) => DetailScreen(place: place, placeId: place.id)),
+                ),
               ),
             ),
           ),
           // ปุ่มบุ๊กมาร์ก (อยู่บนสุด)
           Positioned(
-            top: 10, right: 10,
+            top: 10,
+            right: 10,
             child: Container(
-              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.all(6),
-                icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border, color: Colors.white),
-                onPressed: () => context.read<PlaceProvider>().toggleBookmark(place.id),
+                icon: Icon(
+                  isSaved ? Icons.bookmark : Icons.bookmark_border,
+                  color: Colors.white,
+                ),
+                onPressed: () =>
+                    context.read<PlaceProvider>().toggleBookmark(place.id),
               ),
             ),
           ),
@@ -447,14 +495,14 @@ class _PopularTile extends StatelessWidget {
   void _openDetail(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => DetailScreen(place: place)),
+      MaterialPageRoute(builder: (_) => DetailScreen(place: place, placeId: place.id)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: _HomeScreenState._card,
+      color: kCard,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -478,7 +526,10 @@ class _PopularTile extends StatelessWidget {
                     errorBuilder: (_, __, ___) => Container(
                       color: Colors.black26,
                       alignment: Alignment.center,
-                      child: const Icon(Icons.image_not_supported, color: Colors.white54),
+                      child: const Icon(
+                        Icons.image_not_supported,
+                        color: Colors.white54,
+                      ),
                     ),
                   ),
                 ),
@@ -499,16 +550,25 @@ class _PopularTile extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w800),
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.star, size: 14, color: Color(0xFFFFD166)),
+                          const Icon(
+                            Icons.star,
+                            size: 14,
+                            color: Color(0xFFFFD166),
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             place.rating.toStringAsFixed(1),
-                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -542,14 +602,27 @@ class _Stars extends StatelessWidget {
     return Row(
       children: [
         ...List.generate(5, (i) {
-          if (i < full) return const Icon(Icons.star, size: 16, color: Color(0xFFFFD166));
-          if (i == full && half) return const Icon(Icons.star_half, size: 16, color: Color(0xFFFFD166));
-          return const Icon(Icons.star_border, size: 16, color: Color(0xFFFFD166));
+          if (i < full)
+            return const Icon(Icons.star, size: 16, color: Color(0xFFFFD166));
+          if (i == full && half)
+            return const Icon(
+              Icons.star_half,
+              size: 16,
+              color: Color(0xFFFFD166),
+            );
+          return const Icon(
+            Icons.star_border,
+            size: 16,
+            color: Color(0xFFFFD166),
+          );
         }),
         const SizedBox(width: 6),
         Text(
           rating.toStringAsFixed(1),
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );

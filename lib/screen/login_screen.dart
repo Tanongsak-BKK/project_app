@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:project_app/screen/navbar_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:project_app/screen/signup_screen.dart';
+
+// ✅ ใช้ AuthService เชื่อม Firebase
+import 'package:project_app/service/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,7 +20,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false;
   bool _obscure = true;
   bool _loading = false;
-  
+
+  // ✅ เพิ่ม instance ของ AuthService
+  final _auth = AuthService();
 
   @override
   void initState() {
@@ -51,48 +57,92 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _onLoginPressed() async {
+  // ✅ ล็อกอินจริงด้วย Firebase
+    Future<void> _onLoginPressed() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await Future.delayed(const Duration(milliseconds: 900));
+      await _auth.signInWithEmail(          // ⬅️ แก้บรรทัดนี้
+        email: _emailCtrl.text,
+        password: _passCtrl.text,
+      );
       await _persistRememberMe();
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Logged in successfully (mock)')),
+        const SnackBar(content: Text('เข้าสู่ระบบสำเร็จ')),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const NavbarScreen()),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: $e')),
+        SnackBar(content: Text('เข้าสู่ระบบไม่สำเร็จ: $e')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _signInWithGoogle() async {
-    setState(() => _loading = true);
-    try {
-      await Future.delayed(const Duration(milliseconds: 900));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signed in with Google (mock)')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google sign-in failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+
+  // ✅ ลืมรหัสผ่าน (ส่งอีเมลรีเซ็ต)
+  Future<void> _onForgotPassword() async {
+  final email = _emailCtrl.text.trim();
+  if (email.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('กรุณากรอกอีเมลก่อน')),
+    );
+    return;
   }
+  setState(() => _loading = true);
+  try {
+    await _auth.sendPasswordReset(email); // ✅ ใช้เมธอดจาก AuthService แทนการเข้าถึง _auth ตรงๆ
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ $email แล้ว')),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('ส่งอีเมลรีเซ็ตไม่สำเร็จ: $e')),
+    );
+  } finally {
+    if (mounted) setState(() => _loading = false);
+  }
+}
+
+    Future<void> _signInWithGoogle() async {
+  setState(() => _loading = true);
+  try {
+    await _auth.signInWithGoogle();                // ✅ เรียกของจริง
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('เข้าสู่ระบบด้วย Google สำเร็จ')),
+    );
+    // ไม่มี AuthGate ตอนนี้ → นำทางเอง
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const NavbarScreen()),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Google sign-in ล้มเหลว: $e')),
+    );
+  } finally {
+    if (mounted) setState(() => _loading = false);
+  }
+}
+
+
 
   Future<void> _signInWithGithub() async {
     setState(() => _loading = true);
     try {
-      // TODO: Implement GitHub sign-in (e.g., Firebase Auth + OAuth)
+      // TODO: ทำ GitHub OAuth ภายหลัง
       await Future.delayed(const Duration(milliseconds: 900));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -100,9 +150,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('GitHub sign-in failed: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('GitHub sign-in failed: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -162,7 +211,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 30.0),
-                  // Email field
+
+                  // Email
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -202,7 +252,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-                  // Password field
+
+                  // Password
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -249,7 +300,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 10.0),
+
+                  // Remember + Forgot
                   Row(
                     children: <Widget>[
                       Theme(
@@ -271,13 +325,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const Spacer(),
                       TextButton(
-                        onPressed: _loading
-                            ? null
-                            : () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Forgot password tapped')),
-                                );
-                              },
+                        onPressed: _loading ? null : _onForgotPassword, // ✅ ผูกปุ่มลืมรหัสผ่าน
                         child: const Text(
                           'Forgot Password?',
                           style: TextStyle(
@@ -290,6 +338,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
+
+                  // Login button
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 25.0),
                     child: SizedBox(
@@ -305,7 +355,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? const SizedBox(
                                 height: 22,
                                 width: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                                ),
                               )
                             : const Text(
                                 'LOGIN',
@@ -320,6 +373,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
+
+                  // Divider
                   Row(
                     children: const [
                       Expanded(child: Divider(color: Colors.white70)),
@@ -330,7 +385,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       Expanded(child: Divider(color: Colors.white70)),
                     ],
                   ),
+
                   const SizedBox(height: 16),
+
+                  // SSO (ยัง mock)
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
@@ -342,7 +400,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         background: Colors.white,
                         foreground: Colors.black87,
                       ),
-                    
                       _SsoButton(
                         label: 'GitHub',
                         icon: Icons.code,
@@ -352,12 +409,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 20.0),
+
+                  // ไปหน้า Sign Up
                   TextButton(
                     onPressed: _loading
                         ? null
                         : () {
-                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SignupScreen()));
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SignupScreen()),
+                            );
                           },
                     child: const Text(
                       'Sign Up',

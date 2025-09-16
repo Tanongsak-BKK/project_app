@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:project_app/screen/login_screen.dart';
+import 'package:project_app/screen/navbar_screen.dart';
+import 'package:project_app/service/auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -19,6 +21,8 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscure2 = true;
   bool _agreeTos = false;
   bool _loading = false;
+
+  final _auth = AuthService();
 
   @override
   void dispose() {
@@ -55,45 +59,56 @@ class _SignupScreenState extends State<SignupScreen> {
 
     setState(() => _loading = true);
     try {
-      // TODO: เชื่อมต่อ API / Firebase สมัครสมาชิกจริง
-      await Future.delayed(const Duration(milliseconds: 900));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signed up successfully (mock)')),
+      await _auth.signUpWithEmail(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+        displayName: _usernameCtrl.text.trim(),
       );
-      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('สมัครสมาชิกสำเร็จ')));
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign up failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Sign up failed: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _signUpWithGoogle() async {
+  Future<void> _signInWithGoogle() async {
     setState(() => _loading = true);
     try {
-      // TODO: Firebase Auth + Google Sign-In หรือ OAuth ตามแบ็กเอนด์คุณ
-      await Future.delayed(const Duration(milliseconds: 900));
+      await _auth.signInWithGoogle();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signed up with Google (mock)')),
+        const SnackBar(content: Text('เข้าสู่ระบบด้วย Google สำเร็จ')),
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const NavbarScreen()),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google sign up failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Google sign-in ล้มเหลว: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
+
   Future<void> _signUpWithGithub() async {
     setState(() => _loading = true);
     try {
-      // TODO: GitHub OAuth (เช่นผ่าน Firebase Auth หรือเซิร์ฟเวอร์ของคุณ)
       await Future.delayed(const Duration(milliseconds: 900));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -101,9 +116,9 @@ class _SignupScreenState extends State<SignupScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('GitHub sign up failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('GitHub sign up failed: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -135,7 +150,10 @@ class _SignupScreenState extends State<SignupScreen> {
           // เนื้อหา
           SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 120.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 40.0,
+              vertical: 120.0,
+            ),
             child: Form(
               key: _formKey,
               child: Column(
@@ -157,10 +175,16 @@ class _SignupScreenState extends State<SignupScreen> {
                     child: TextFormField(
                       controller: _usernameCtrl,
                       textInputAction: TextInputAction.next,
-                      decoration: _inputDec(hint: 'Enter your Username', icon: Icons.person),
+                      autofocus: true,
+                      decoration: _inputDec(
+                        hint: 'Enter your Username',
+                        icon: Icons.person,
+                      ),
                       validator: (v) => (v == null || v.trim().isEmpty)
                           ? 'Please enter username'
-                          : (v.trim().length < 3 ? 'Username must be at least 3 chars' : null),
+                          : (v.trim().length < 3
+                                ? 'Username must be at least 3 chars'
+                                : null),
                     ),
                   ),
 
@@ -173,11 +197,16 @@ class _SignupScreenState extends State<SignupScreen> {
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      decoration: _inputDec(hint: 'Enter your Email', icon: Icons.email),
+                      decoration: _inputDec(
+                        hint: 'Enter your Email',
+                        icon: Icons.email,
+                      ),
                       validator: (v) {
                         final value = v?.trim() ?? '';
                         if (value.isEmpty) return 'Please enter email';
-                        final emailRegex = RegExp(r'^.+@.+\..+$');
+                        final emailRegex = RegExp(
+                          r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$",
+                        );
                         if (!emailRegex.hasMatch(value)) return 'Invalid email';
                         return null;
                       },
@@ -192,12 +221,21 @@ class _SignupScreenState extends State<SignupScreen> {
                     child: TextFormField(
                       controller: _passwordCtrl,
                       obscureText: _obscure1,
-                      decoration: _inputDec(hint: 'Enter your Password', icon: Icons.lock).copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(_obscure1 ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () => setState(() => _obscure1 = !_obscure1),
-                        ),
-                      ),
+                      decoration:
+                          _inputDec(
+                            hint: 'Enter your Password',
+                            icon: Icons.lock,
+                          ).copyWith(
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscure1
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _obscure1 = !_obscure1),
+                            ),
+                          ),
                       validator: (v) => (v == null || v.length < 6)
                           ? 'Password must be at least 6 chars'
                           : null,
@@ -212,15 +250,21 @@ class _SignupScreenState extends State<SignupScreen> {
                     child: TextFormField(
                       controller: _confirmCtrl,
                       obscureText: _obscure2,
-                      decoration: _inputDec(
-                        hint: 'Re-enter your Password',
-                        icon: Icons.lock_outline,
-                      ).copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(_obscure2 ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () => setState(() => _obscure2 = !_obscure2),
-                        ),
-                      ),
+                      decoration:
+                          _inputDec(
+                            hint: 'Re-enter your Password',
+                            icon: Icons.lock_outline,
+                          ).copyWith(
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscure2
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _obscure2 = !_obscure2),
+                            ),
+                          ),
                       validator: (v) => (v != _passwordCtrl.text)
                           ? 'Passwords do not match'
                           : null,
@@ -234,7 +278,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     children: [
                       Checkbox(
                         value: _agreeTos,
-                        onChanged: (v) => setState(() => _agreeTos = v ?? false),
+                        onChanged: (v) =>
+                            setState(() => _agreeTos = v ?? false),
                         activeColor: Colors.white,
                         checkColor: const Color.fromARGB(255, 0, 71, 154),
                       ),
@@ -267,7 +312,9 @@ class _SignupScreenState extends State<SignupScreen> {
                               width: 22,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation(Colors.white),
+                                valueColor: AlwaysStoppedAnimation(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : const Text(
@@ -291,7 +338,10 @@ class _SignupScreenState extends State<SignupScreen> {
                       Expanded(child: Divider(color: Colors.white70)),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 10.0),
-                        child: Text('or sign up with', style: TextStyle(color: Colors.white70)),
+                        child: Text(
+                          'or sign up with',
+                          style: TextStyle(color: Colors.white70),
+                        ),
                       ),
                       Expanded(child: Divider(color: Colors.white70)),
                     ],
@@ -307,7 +357,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       _SsoButton(
                         label: 'Google',
                         icon: Icons.g_mobiledata,
-                        onTap: _loading ? null : _signUpWithGoogle,
+                        onTap: _loading
+                            ? null
+                            : _signInWithGoogle, // <-- fixed function name
                         background: Colors.white,
                         foreground: Colors.black87,
                       ),
@@ -330,7 +382,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         : () {
                             Navigator.pushReplacement(
                               context,
-                              MaterialPageRoute(builder: (_) => const LoginScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => const LoginScreen(),
+                              ),
                             );
                           },
                     child: const Text(
@@ -398,7 +452,11 @@ class _FieldBox extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(10.0),
         boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 6.0, offset: Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 6.0,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: child,
@@ -433,7 +491,9 @@ class _SsoButton extends StatelessWidget {
           backgroundColor: background,
           foregroundColor: foreground,
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           elevation: 2,
         ),
       ),

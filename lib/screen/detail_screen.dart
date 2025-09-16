@@ -4,7 +4,7 @@ import '../model/place.dart';
 
 class DetailScreen extends StatefulWidget {
   final Place place;
-  const DetailScreen({super.key, required this.place});
+  const DetailScreen({super.key, required this.place, required String placeId});
 
   @override
   State<DetailScreen> createState() => _DetailScreenState();
