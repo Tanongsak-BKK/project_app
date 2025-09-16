@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'provider/place_provider.dart';
 import 'screen/home_screen.dart';
+import 'screen/navbar_screen.dart';
 
 void main() {
   runApp(
@@ -20,7 +21,7 @@ class MyApp extends StatelessWidget {
   debugShowCheckedModeBanner: false, // << ปิดแถบ DEBUG
   title: 'Travel App',
   theme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xFF2F80ED)),
-  home: const HomeScreen(),
+  home: const NavbarScreen(),
 );
 
   }
