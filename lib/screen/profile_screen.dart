@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:project_app/screen/login_screen.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -158,8 +158,6 @@ Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(User user) async* 
                         (data['displayName'] ?? user.displayName ?? 'Your Name').toString();
                     final email = (data['email'] ?? user.email ?? '').toString();
                     final photo = (data['photoUrl'] ?? user.photoURL)?.toString();
-                    final bio = (data['bio'] ?? '').toString();
-                    final location = (data['location'] ?? '').toString();
                     final ts = data['createdAt'];
                     String since = '';
                     if (ts is Timestamp) {
@@ -359,84 +357,6 @@ class _GlassCard extends StatelessWidget {
     );
   }
 }
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 68,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.12),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(.15)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          const Icon(Icons.local_florist, color: Colors.white),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Opacity(
-                  opacity: .85,
-                  child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PillInfo extends StatelessWidget {
-  const _PillInfo({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.12),
-        borderRadius: BorderRadius.circular(50),
-        border: Border.all(color: Colors.white.withOpacity(.15)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white.withOpacity(.95), size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SettingTile extends StatelessWidget {
   const _SettingTile({
     required this.icon,

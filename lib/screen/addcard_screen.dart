@@ -1,5 +1,4 @@
 // lib/screen/addcard_screen.dart
-import 'dart:io' show File;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -8,6 +7,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 // ถ้า enum Region อยู่ใน model ของคุณ
 import 'package:project_app/model/place.dart' show Region;
@@ -134,47 +135,58 @@ class _AddCardScreenState extends State<AddCardScreen> {
   }
 
   Future<void> _savePlace() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    final title = _titleCtrl.text.trim();
-    final description = _descCtrl.text.trim();
-    final imageUrl = _imageUrlCtrl.text.trim();
-    final address = _addressCtrl.text.trim();
-    final ratingStr = _ratingCtrl.text.trim();
-
-    double rating = 4.5;
-    final parsed = double.tryParse(ratingStr);
-    if (parsed != null) rating = parsed.clamp(0, 5);
-
-    setState(() => _saving = true);
-    try {
-      final doc = FirebaseFirestore.instance.collection('places').doc();
-      await doc.set({
-        'id': doc.id,
-        'title': title,
-        'description': description,
-        'imageUrl': imageUrl,
-        'address': address,
-        'region': _regionToKey(_region),
-        'rating': rating,
-        'popularity': 0,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('บันทึกสถานที่เรียบร้อย')),
-      );
-      Navigator.pop(context, true); // ให้หน้าเดิม reload ได้
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')));
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+  // เช็คล็อกอินก่อน
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนบันทึก')),
+    );
+    return;
   }
+
+  final title = _titleCtrl.text.trim();
+  final description = _descCtrl.text.trim();
+  final imageUrl = _imageUrlCtrl.text.trim();
+  final address = _addressCtrl.text.trim();
+  final ratingStr = _ratingCtrl.text.trim();
+
+  double rating = 4.5;
+  final parsed = double.tryParse(ratingStr);
+  if (parsed != null) rating = parsed.clamp(0, 5);
+
+  setState(() => _saving = true);
+  try {
+    final doc = FirebaseFirestore.instance.collection('places').doc();
+    await doc.set({
+      'id': doc.id,
+      'userId': user.uid,                  // << สำคัญ: ผูกเจ้าของเอกสาร
+      'title': title,
+      'description': description,
+      'imageUrl': imageUrl,
+      'address': address,
+      'region': _regionToKey(_region),
+      'rating': rating,
+      'popularity': 0,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('บันทึกสถานที่เรียบร้อย')),
+    );
+    Navigator.pop(context, true);
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')));
+  } finally {
+    if (mounted) setState(() => _saving = false);
+  }
+}
+
 
   InputDecoration _dec({
     required String hint,
