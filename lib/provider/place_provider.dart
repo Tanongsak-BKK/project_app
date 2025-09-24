@@ -58,4 +58,11 @@ class PlaceProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+   void updateRating(String placeId, double newRating) {
+    final i = _places.indexWhere((p) => p.id == placeId);
+    if (i == -1) return;
+    _places[i] = _places[i].copyWith(rating: newRating);
+    notifyListeners();
+  }
 }

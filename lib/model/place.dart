@@ -49,6 +49,30 @@ class Place {
     this.updatedAt,
   });
 
+  Place copyWith({
+    String? id,
+    String? userId,
+    String? title,
+    String? description,
+    String? imageUrl,
+    String? address,
+    Region? region,
+    double? rating,
+    int? popularity,
+  }) {
+    return Place(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+      address: address ?? this.address,
+      region: region ?? this.region,
+      rating: rating ?? this.rating,
+      popularity: popularity ?? this.popularity,
+    );
+  }
+
   factory Place.fromMap(Map<String, dynamic> m, String id) {
     // ช่วยแปลง number -> double/int ปลอดภัย
     double _toDouble(dynamic v, {double def = 0}) {

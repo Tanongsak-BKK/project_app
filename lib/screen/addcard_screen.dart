@@ -8,11 +8,12 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:project_app/screen/navbar_screen.dart';
 
 // ถ้า enum Region อยู่ใน model ของคุณ
 import 'package:project_app/model/place.dart' show Region;
 
-// << NEW: หน้าเลือกแผนที่
+// หน้าเลือกแผนที่
 import 'package:project_app/screen/maps_screen.dart';
 
 class AddCardScreen extends StatefulWidget {
@@ -29,14 +30,13 @@ class _AddCardScreenState extends State<AddCardScreen> {
   final _descCtrl = TextEditingController();
   final _imageUrlCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
-  final _ratingCtrl = TextEditingController(text: '4.5');
 
   Region _region = Region.north;
   bool _saving = false;
   bool _uploading = false;
   double _uploadProgress = 0;
 
-  // << NEW: เก็บผลจากหน้าแผนที่ เพื่อแสดงสรุป
+  // เก็บผลจากหน้าแผนที่ เพื่อแสดงสรุป
   MapPickResult? _pickedMap;
 
   @override
@@ -45,7 +45,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
     _descCtrl.dispose();
     _imageUrlCtrl.dispose();
     _addressCtrl.dispose();
-    _ratingCtrl.dispose();
     super.dispose();
   }
 
@@ -62,12 +61,8 @@ class _AddCardScreenState extends State<AddCardScreen> {
     }
   }
 
-  /// บีบอัดภาพ (มือถือจะเห็นผลมากที่สุด)
   Future<Uint8List> _compressBytes(Uint8List data) async {
-    if (kIsWeb) {
-      // เว็บ: ข้ามการบีบอัด
-      return data;
-    }
+    if (kIsWeb) return data;
     final out = await FlutterImageCompress.compressWithList(
       data,
       quality: 68,
@@ -77,7 +72,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
     return out;
   }
 
-  /// เลือกรูป → บีบอัด → putData → ได้ URL → เติมลงช่องภาพอัตโนมัติ
   Future<void> _pickAndUploadImage() async {
     try {
       final picker = ImagePicker();
@@ -138,7 +132,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
     }
   }
 
-  // << NEW: เปิดหน้าแผนที่ แล้วรับค่ากลับมาวางที่ address
   Future<void> _pickAddressOnMap() async {
     final res = await Navigator.push<MapPickResult>(
       context,
@@ -158,7 +151,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
   Future<void> _savePlace() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // เช็คล็อกอินก่อน
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -170,12 +162,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
     final title = _titleCtrl.text.trim();
     final description = _descCtrl.text.trim();
     final imageUrl = _imageUrlCtrl.text.trim();
-    final address = _addressCtrl.text.trim(); // << ใช้ค่าจากปุ่มเลือกแผนที่
-    final ratingStr = _ratingCtrl.text.trim();
-
-    double rating = 4.5;
-    final parsed = double.tryParse(ratingStr);
-    if (parsed != null) rating = parsed.clamp(0, 5);
+    final address = _addressCtrl.text.trim();
 
     setState(() => _saving = true);
     try {
@@ -188,17 +175,23 @@ class _AddCardScreenState extends State<AddCardScreen> {
         'imageUrl': imageUrl,
         'address': address,
         'region': _regionToKey(_region),
-        'rating': rating,
+        'rating': 0.0, // ★ ตั้งค่าเรตติ้งเป็น 0 เสมอ
         'popularity': 0,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('บันทึกสถานที่เรียบร้อย')),
       );
-      Navigator.pop(context, true);
+
+      // ไปที่ NavbarScreen (มี HomeScreen อยู่ข้างใน)
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const NavbarScreen()),
+        (route) => false,
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -231,7 +224,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        // ไล่โทนธรรมชาติ
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft, end: Alignment.bottomRight,
@@ -277,11 +269,12 @@ class _AddCardScreenState extends State<AddCardScreen> {
                               ),
                             if (_uploading) ...[
                               const SizedBox(height: 12),
-                              LinearProgressIndicator(value: _uploadProgress == 0 ? null : _uploadProgress),
+                              LinearProgressIndicator(
+                                value: _uploadProgress == 0 ? null : _uploadProgress,
+                              ),
                             ],
                             const SizedBox(height: 14),
 
-                            // URL + ปุ่มเลือกรูป (อัปโหลด-บีบอัด)
                             Row(
                               children: [
                                 Expanded(
@@ -335,7 +328,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
 
                             const SizedBox(height: 10),
 
-                            // ===== NEW: ปุ่มเลือกตำแหน่งจากแผนที่ + กล่องแสดงผล =====
                             Align(
                               alignment: Alignment.centerLeft,
                               child: Text('ที่อยู่/พิกัด', style: Theme.of(context).textTheme.bodyMedium),
@@ -405,7 +397,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
                                 child: const Text('ยังไม่ได้เลือกตำแหน่งจากแผนที่'),
                               ),
                             ],
-                            // ===== END NEW =====
 
                             const SizedBox(height: 10),
                             DropdownButtonFormField<Region>(
@@ -419,19 +410,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                               ],
                               onChanged: (v) => setState(() => _region = v ?? Region.north),
                             ),
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _ratingCtrl,
-                              decoration: _dec(hint: 'เรตติ้ง (0–5, ใส่ทศนิยมได้)', icon: Icons.star_rate_rounded),
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) return null;
-                                final x = double.tryParse(v);
-                                if (x == null || x < 0 || x > 5) return 'กรุณากรอก 0–5';
-                                return null;
-                              },
-                              textInputAction: TextInputAction.newline,
-                            ),
+
                             const SizedBox(height: 10),
                             TextFormField(
                               controller: _descCtrl,

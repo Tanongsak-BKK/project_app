@@ -1,6 +1,7 @@
 // lib/screen/maps_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -9,13 +10,12 @@ import 'package:geocoding/geocoding.dart';
 class MapPickResult {
   final double lat;
   final double lng;
-  final String address; // ที่อยู่ที่ reverse geocode ได้ (ถ้าได้)
+  final String address;
   const MapPickResult({required this.lat, required this.lng, required this.address});
 }
 
 class MapsScreen extends StatefulWidget {
   const MapsScreen({super.key, this.initial});
-  /// กรณีมีค่าเริ่มต้น (เช่น เคยเลือกไว้แล้ว) ส่งมาได้
   final LatLng? initial;
 
   @override
@@ -30,12 +30,12 @@ class _MapsScreenState extends State<MapsScreen> {
   bool _loadingAddr = false;
 
   CameraPosition get _initialCam => CameraPosition(
-    target: widget.initial ?? _bkk,
-    zoom: widget.initial != null ? 15 : 12,
-  );
+        target: widget.initial ?? _bkk,
+        zoom: widget.initial != null ? 15 : 12,
+      );
 
-  Future<void> _goMyLocation() async {
-    LocationPermission perm = await Geolocator.checkPermission();
+  Future<void> _ensureLocationPermission() async {
+    var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
@@ -44,21 +44,47 @@ class _MapsScreenState extends State<MapsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('โปรดอนุญาตการเข้าถึงตำแหน่ง')),
       );
-      return;
+      throw Exception('no-permission');
     }
+  }
 
-    final p = await Geolocator.getCurrentPosition();
-    final ll = LatLng(p.latitude, p.longitude);
-    _map?.animateCamera(CameraUpdate.newLatLngZoom(ll, 16));
+  Future<void> _goMyLocation() async {
+    try {
+      await _ensureLocationPermission();
+      final p = await Geolocator.getCurrentPosition();
+      final ll = LatLng(p.latitude, p.longitude);
+
+      // ปักหมุดที่ตำแหน่งฉัน + หา address (ถ้าเป็น mobile)
+      setState(() {
+        _picked = ll;
+        _addr = '';
+        _loadingAddr = true;
+      });
+      _map?.animateCamera(CameraUpdate.newLatLngZoom(ll, 16));
+
+      await _reverseGeocode(ll); // บนเว็บจะข้ามไปเอง (ใช้ lat,lng แทน)
+    } catch (_) {
+      // เงียบไว้พอ
+    }
   }
 
   Future<void> _reverseGeocode(LatLng ll) async {
-    setState(() { _loadingAddr = true; _addr = ''; });
+    if (kIsWeb) {
+      // บนเว็บ: ข้าม geocoding package (บางเคสไม่เสถียร) ใช้ lat,lng แทน
+      setState(() {
+        _addr = '';
+        _loadingAddr = false;
+      });
+      return;
+    }
+    setState(() {
+      _loadingAddr = true;
+      _addr = '';
+    });
     try {
       final placemarks = await placemarkFromCoordinates(ll.latitude, ll.longitude);
       if (placemarks.isNotEmpty) {
         final pm = placemarks.first;
-        // ประกอบที่อยู่แบบสั้นและอ่านง่าย
         final parts = [
           pm.name,
           pm.subLocality,
@@ -67,20 +93,25 @@ class _MapsScreenState extends State<MapsScreen> {
           pm.postalCode,
           pm.country
         ].where((e) => (e != null && e!.trim().isNotEmpty)).map((e) => e!.trim()).toList();
-        setState(() { _addr = parts.join(', '); });
-      } else {
-        setState(() { _addr = ''; });
+        setState(() {
+          _addr = parts.join(', ');
+        });
       }
     } catch (_) {
-      setState(() { _addr = ''; });
+      setState(() {
+        _addr = '';
+      });
     } finally {
-      setState(() { _loadingAddr = false; });
+      setState(() {
+        _loadingAddr = false;
+      });
     }
   }
 
   void _onMapTap(LatLng ll) {
     setState(() {
       _picked = ll;
+      _addr = '';
     });
     _reverseGeocode(ll);
   }
@@ -88,25 +119,33 @@ class _MapsScreenState extends State<MapsScreen> {
   void _confirm() {
     if (_picked == null) return;
     final ll = _picked!;
-    Navigator.pop(context, MapPickResult(
-      lat: ll.latitude,
-      lng: ll.longitude,
-      address: _addr, // อาจว่างได้ถ้า reverse ไม่สำเร็จ
-    ));
+    Navigator.pop(
+      context,
+      MapPickResult(
+        lat: ll.latitude,
+        lng: ll.longitude,
+        address: _addr, // อาจว่างถ้าเป็นเว็บ/หาไม่ได้
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final marker = _picked == null ? <Marker>{} : {
-      Marker(
-        markerId: const MarkerId('picked'),
-        position: _picked!,
-        infoWindow: InfoWindow(
-          title: 'ตำแหน่งที่เลือก',
-          snippet: _addr.isNotEmpty ? _addr : '${_picked!.latitude.toStringAsFixed(6)}, ${_picked!.longitude.toStringAsFixed(6)}',
+    final markerSet = <Marker>{};
+    if (_picked != null) {
+      markerSet.add(
+        Marker(
+          markerId: const MarkerId('picked'),
+          position: _picked!,
+          infoWindow: InfoWindow(
+            title: 'ตำแหน่งที่เลือก',
+            snippet: _addr.isNotEmpty
+                ? _addr
+                : '${_picked!.latitude.toStringAsFixed(6)}, ${_picked!.longitude.toStringAsFixed(6)}',
+          ),
         ),
-      )
-    };
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -115,7 +154,7 @@ class _MapsScreenState extends State<MapsScreen> {
           IconButton(
             onPressed: _goMyLocation,
             icon: const Icon(Icons.my_location),
-            tooltip: 'ไปตำแหน่งฉัน',
+            tooltip: 'ไปตำแหน่งฉัน (ปักหมุดให้)',
           ),
         ],
       ),
@@ -125,54 +164,51 @@ class _MapsScreenState extends State<MapsScreen> {
             initialCameraPosition: _initialCam,
             onMapCreated: (c) => _map = c,
             onTap: _onMapTap,
-            markers: marker,
+            markers: markerSet,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
           ),
-
-          // แถบข้อมูลด้านล่าง
           Positioned(
-            left: 12, right: 12, bottom: 12,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 200),
-              opacity: _picked == null ? 0.8 : 1,
-              child: Card(
-                elevation: 6,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.pin_drop_outlined),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _picked == null
-                                  ? 'แตะบนแผนที่เพื่อเลือกตำแหน่ง'
-                                  : _loadingAddr
-                                      ? 'กำลังค้นหาที่อยู่…'
-                                      : (_addr.isNotEmpty
-                                          ? _addr
-                                          : '${_picked!.latitude.toStringAsFixed(6)}, ${_picked!.longitude.toStringAsFixed(6)}'),
-                              maxLines: 2, overflow: TextOverflow.ellipsis,
-                            ),
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: Card(
+              elevation: 6,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.pin_drop_outlined),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _picked == null
+                                ? 'แตะบนแผนที่เพื่อเลือกตำแหน่ง หรือกดไอคอนเป้าเพื่อใช้ตำแหน่งฉัน'
+                                : _loadingAddr
+                                    ? 'กำลังค้นหาที่อยู่…'
+                                    : (_addr.isNotEmpty
+                                        ? _addr
+                                        : '${_picked!.latitude.toStringAsFixed(6)}, ${_picked!.longitude.toStringAsFixed(6)}'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _picked == null ? null : _confirm,
-                          icon: const Icon(Icons.check),
-                          label: const Text('ยืนยันตำแหน่งนี้'),
                         ),
-                      )
-                    ],
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _picked == null ? null : _confirm,
+                        icon: const Icon(Icons.check),
+                        label: const Text('ยืนยันตำแหน่งนี้'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
