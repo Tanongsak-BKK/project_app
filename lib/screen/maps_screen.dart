@@ -92,7 +92,7 @@ class _MapsScreenState extends State<MapsScreen> {
           pm.administrativeArea,
           pm.postalCode,
           pm.country
-        ].where((e) => (e != null && e!.trim().isNotEmpty)).map((e) => e!.trim()).toList();
+        ].where((e) => (e != null && e.trim().isNotEmpty)).map((e) => e!.trim()).toList();
         setState(() {
           _addr = parts.join(', ');
         });
