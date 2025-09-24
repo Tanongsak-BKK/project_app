@@ -137,25 +137,28 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-
-
   Future<void> _signInWithGithub() async {
-    setState(() => _loading = true);
-    try {
-      // TODO: ทำ GitHub OAuth ภายหลัง
-      await Future.delayed(const Duration(milliseconds: 900));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signed in with GitHub (mock)')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('GitHub sign-in failed: $e')));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+  setState(() => _loading = true);
+  try {
+    await _auth.signInWithGithub(); // ✅ ของจริง
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('เข้าสู่ระบบด้วย GitHub สำเร็จ')),
+    );
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const NavbarScreen()),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('GitHub sign-in ล้มเหลว: $e')),
+    );
+  } finally {
+    if (mounted) setState(() => _loading = false);
   }
+}
+
 
   InputDecoration _inputDecoration({
     required String hint,

@@ -26,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // โหลดข้อมูลครั้งแรก
+    // โหลดข้อมูลครั้งแรก (ถ้า main เรียกอยู่แล้ว ส่วนนี้ไม่เป็นไร จะ merge กันได้)
     Future.microtask(() => context.read<PlaceProvider>().loadPlaces());
   }
 
@@ -139,22 +139,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: prov.isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : prov.error != null
-                        ? Center(
-                            child: Text(
-                              prov.error!,
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                          )
-                        : TabBarView(
-                            physics: const BouncingScrollPhysics(),
-                            children: [
-                              _AllTab(query: _query), // Pass query here
-                              _RegionTab(region: Region.north, query: _query),
-                              _RegionTab(region: Region.south, query: _query),
-                              _RegionTab(region: Region.east, query: _query),
-                              _RegionTab(region: Region.west, query: _query),
-                            ],
-                          ),
+                            ? Center(
+                                child: Text(
+                                  prov.error!,
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                              )
+                            : TabBarView(
+                                physics: const BouncingScrollPhysics(),
+                                children: [
+                                  _AllTab(query: _query), // Pass query here
+                                  _RegionTab(region: Region.north, query: _query),
+                                  _RegionTab(region: Region.south, query: _query),
+                                  _RegionTab(region: Region.east, query: _query),
+                                  _RegionTab(region: Region.west, query: _query),
+                                ],
+                              ),
                   ),
                 ],
               ),
@@ -454,7 +454,8 @@ class _PlaceCard extends StatelessWidget {
               child: InkWell(
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => DetailScreen(place: place, placeId: place.id)),
+                  // ✅ ปรับให้ตรงกับ DetailScreen ใหม่ (ส่งเฉพาะ place)
+                  MaterialPageRoute(builder: (_) => DetailScreen(place: place)),
                 ),
               ),
             ),
@@ -495,7 +496,8 @@ class _PopularTile extends StatelessWidget {
   void _openDetail(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => DetailScreen(place: place, placeId: place.id)),
+      // ✅ ปรับให้ตรงกับ DetailScreen ใหม่ (ส่งเฉพาะ place)
+      MaterialPageRoute(builder: (_) => DetailScreen(place: place)),
     );
   }
 
@@ -602,19 +604,12 @@ class _Stars extends StatelessWidget {
     return Row(
       children: [
         ...List.generate(5, (i) {
-          if (i < full)
+          if (i < full) {
             return const Icon(Icons.star, size: 16, color: Color(0xFFFFD166));
-          if (i == full && half)
-            return const Icon(
-              Icons.star_half,
-              size: 16,
-              color: Color(0xFFFFD166),
-            );
-          return const Icon(
-            Icons.star_border,
-            size: 16,
-            color: Color(0xFFFFD166),
-          );
+          } else if (i == full && half) {
+            return const Icon(Icons.star_half, size: 16, color: Color(0xFFFFD166));
+          }
+          return const Icon(Icons.star_border, size: 16, color: Color(0xFFFFD166));
         }),
         const SizedBox(width: 6),
         Text(

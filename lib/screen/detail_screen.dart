@@ -1,10 +1,11 @@
 // lib/screen/detail_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../model/place.dart';
 
 class DetailScreen extends StatefulWidget {
   final Place place;
-  const DetailScreen({super.key, required this.place, required String placeId});
+  const DetailScreen({super.key, required this.place});
 
   @override
   State<DetailScreen> createState() => _DetailScreenState();
@@ -12,18 +13,19 @@ class DetailScreen extends StatefulWidget {
 
 class _DetailScreenState extends State<DetailScreen> {
   bool _readMore = false;
-
-  static const _accent = Color(0xFF2F80ED);
-
+  
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // คำบรรยายตัวอย่าง (หากยังไม่มีในโมเดล)
-    final aboutText =
-        "San Marino is a mountainous microstate surrounded by north-central Italy. "
-        "Among the world's oldest republics, it retains much of its historic architecture. "
-        "On the slopes of Monte Titano sits the capital, also called San Marino, known for its ...";
+    // ใช้ข้อมูลจริงจาก place (non-nullable)
+    final imageUrl    = widget.place.imageUrl;
+    final title       = widget.place.title;
+    final region      = widget.place.region;
+    final rating      = widget.place.rating;
+    final address     = widget.place.address.trim();
+    final description = widget.place.description.trim();
+    final popularity  = widget.place.popularity;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -32,21 +34,20 @@ class _DetailScreenState extends State<DetailScreen> {
           SingleChildScrollView(
             child: Column(
               children: [
-                // รูปหัว (Hero ถ้าอยากทำต่อ)
+                // รูปหัว
                 AspectRatio(
                   aspectRatio: 16 / 10,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.network(
-                        widget.place.imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: Colors.black12,
-                          alignment: Alignment.center,
-                          child: const Icon(Icons.image_not_supported, size: 40, color: Colors.black38),
-                        ),
-                      ),
+                      if (imageUrl.isNotEmpty)
+                        Image.network(
+                          imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _imageFallback(),
+                        )
+                      else
+                        _imageFallback(),
                       const DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
@@ -56,11 +57,17 @@ class _DetailScreenState extends State<DetailScreen> {
                           ),
                         ),
                       ),
+                      // badge ความป๊อป
+                      Positioned(
+                        right: 10,
+                        top: 10,
+                        child: _PopularityBadge(popularity: popularity),
+                      ),
                     ],
                   ),
                 ),
 
-                // การ์ดรายละเอียดซ้อนทับ
+                // การ์ดรายละเอียด
                 Transform.translate(
                   offset: const Offset(0, -20),
                   child: Container(
@@ -83,132 +90,99 @@ class _DetailScreenState extends State<DetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ชื่อ + ที่ตั้ง + ดาว
+                        // ชื่อ
                         Text(
-                          widget.place.title,
+                          title,
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: Colors.black,
                           ),
                         ),
                         const SizedBox(height: 6),
+
+                        // ภูมิภาค + ดาว
                         Row(
                           children: [
                             const Icon(Icons.location_on, color: Colors.grey, size: 18),
                             const SizedBox(width: 6),
                             Text(
-                              _regionLabel(widget.place.region),
+                              _regionLabel(region),
                               style: const TextStyle(color: Colors.black54),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _Stars(rating: widget.place.rating),
-                        const SizedBox(height: 16),
-
-                        // About
-                        Text(
-                          "About",
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        AnimatedCrossFade(
-                          firstChild: Text(
-                            aboutText,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.black87, height: 1.4),
-                          ),
-                          secondChild: Text(
-                            aboutText,
-                            style: const TextStyle(color: Colors.black87, height: 1.4),
-                          ),
-                          crossFadeState:
-                              _readMore ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                          duration: const Duration(milliseconds: 200),
-                        ),
-                        const SizedBox(height: 4),
-                        TextButton(
-                          onPressed: () => setState(() => _readMore = !_readMore),
-                          child: Text(_readMore ? "Read less" : "Read more"),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        // Including Services
-                        Text(
-                          "Including Services",
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: const [
-                            _ServiceChip(label: "Air ticket"),
-                            _ServiceChip(label: "train ticket"),
-                            _ServiceChip(label: "3 star hotel"),
-                            _ServiceChip(label: "buffet"),
-                          ],
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // ราคา + ปุ่ม Book
-                        Row(
-                          children: [
-                            RichText(
-                              text: const TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: "450",
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 28,
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: " /Package",
-                                    style: TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                             const Spacer(),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _accent,
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                elevation: 0,
-                              ),
-                              onPressed: () {
-                                // TODO: hook ฟังก์ชันจองจริงภายหลัง
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("Booking not implemented yet.")),
-                                );
-                              },
-                              child: const Text(
-                                "BOOK NOW",
-                                style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: .3),
-                              ),
-                            ),
+                            _Stars(rating: rating),
                           ],
                         ),
+
+                        // ที่อยู่ (ถ้ามี)
+                        if (address.isNotEmpty) ...[
+                          const Divider(height: 24),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2),
+                                child: Icon(Icons.map_rounded, color: Colors.black54, size: 20),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  address,
+                                  style: const TextStyle(color: Colors.black87, height: 1.3),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                tooltip: 'คัดลอกที่อยู่',
+                                onPressed: () async {
+                                  await Clipboard.setData(ClipboardData(text: address));
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('คัดลอกที่อยู่แล้ว')),
+                                  );
+                                },
+                                icon: const Icon(Icons.copy, size: 18, color: Colors.black54),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        // รายละเอียด (description)
+                        if (description.isNotEmpty) ...[
+                          const Divider(height: 24),
+                          Text(
+                            "รายละเอียด",
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          AnimatedCrossFade(
+                            firstChild: Text(
+                              description,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.black87, height: 1.4),
+                            ),
+                            secondChild: Text(
+                              description,
+                              style: const TextStyle(color: Colors.black87, height: 1.4),
+                            ),
+                            crossFadeState: _readMore
+                                ? CrossFadeState.showSecond
+                                : CrossFadeState.showFirst,
+                            duration: const Duration(milliseconds: 200),
+                          ),
+                          if (description.length > 140)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton(
+                                onPressed: () => setState(() => _readMore = !_readMore),
+                                child: Text(_readMore ? "Read less" : "Read more"),
+                              ),
+                            ),
+                        ],
                       ],
                     ),
                   ),
@@ -217,7 +191,7 @@ class _DetailScreenState extends State<DetailScreen> {
             ),
           ),
 
-          // ปุ่ม Back แบบกลมวางบนรูป
+          // ปุ่ม Back
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -240,37 +214,47 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
+  Widget _imageFallback() => Container(
+        color: Colors.black12,
+        alignment: Alignment.center,
+        child: const Icon(Icons.image_not_supported, size: 40, color: Colors.black38),
+      );
+
   String _regionLabel(Region r) {
     switch (r) {
-      case Region.north:
-        return "North, Thailand";
-      case Region.south:
-        return "South, Thailand";
-      case Region.east:
-        return "East, Thailand";
-      case Region.west:
-        return "West, Thailand";
+      case Region.north: return "North, Thailand";
+      case Region.south: return "South, Thailand";
+      case Region.east:  return "East, Thailand";
+      case Region.west:  return "West, Thailand";
     }
   }
 }
 
 /* -------------------------- Widgets -------------------------- */
 
-class _ServiceChip extends StatelessWidget {
-  final String label;
-  const _ServiceChip({required this.label});
+class _PopularityBadge extends StatelessWidget {
+  final int popularity;
+  const _PopularityBadge({required this.popularity});
 
   @override
   Widget build(BuildContext context) {
+    if (popularity <= 0) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F7),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.black.withOpacity(.45),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(
-        label,
-        style: const TextStyle(color: Color(0xFF111827), fontSize: 12, fontWeight: FontWeight.w600),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_fire_department, color: Colors.orangeAccent, size: 18),
+          const SizedBox(width: 6),
+          Text(
+            '$popularity',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }

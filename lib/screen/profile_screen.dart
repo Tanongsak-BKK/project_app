@@ -4,6 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
+// ✅ เพิ่มเติมเพื่อให้ signOut ครอบคลุมทุกกรณี (รวม Google)
+import 'package:project_app/service/auth_service.dart';
+// ✅ นำทางกลับหน้า Login หลังออกจากระบบ
+import 'package:project_app/screen/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -32,24 +36,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   /// stream เอกสารผู้ใช้ (สร้างถ้ายังไม่มี)
-  /// stream เอกสารผู้ใช้ (สร้างถ้ายังไม่มี)
-Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(User user) async* {
-  final ref = _db.collection('users').doc(user.uid);
-  final snap = await ref.get();
-  if (!snap.exists) {
-    await ref.set({
-      'uid': user.uid,
-      'email': user.email,
-      'displayName': user.displayName ?? user.email?.split('@').first ?? 'User',
-      'photoUrl': user.photoURL,
-      'bio': '',
-      'location': '',
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+  Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(User user) async* {
+    final ref = _db.collection('users').doc(user.uid);
+    final snap = await ref.get();
+    if (!snap.exists) {
+      await ref.set({
+        'uid': user.uid,
+        'email': user.email,
+        'displayName': user.displayName ?? user.email?.split('@').first ?? 'User',
+        'photoUrl': user.photoURL,
+        'bio': '',
+        'location': '',
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+    yield* ref.snapshots();
   }
-  yield* ref.snapshots();
-}
-
 
   Future<void> _openEditSheet(Map<String, dynamic> data) async {
     _nameCtrl.text = (data['displayName'] ?? '').toString();
@@ -121,7 +123,7 @@ Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(User user) async* 
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          // โทนธรรมชาติ (เขียว-ฟ้า ไล่เฉด + ลายใบไม้เบา ๆ ด้วย gradient)
+          // โทนธรรมชาติ (เขียว-ฟ้า ไล่เฉด)
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -174,7 +176,6 @@ Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(User user) async* 
                           pinned: true,
                           elevation: 0,
                           title: const Text('Profile', style: TextStyle(color: Colors.white)),
-                          
                         ),
 
                         // Header card
@@ -222,12 +223,7 @@ Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(User user) async* 
                                     ),
                                   ],
                                   const SizedBox(height: 14),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                   
-                                  ),
                                   const SizedBox(height: 12),
-                                
                                   const SizedBox(height: 16),
                                   Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -274,30 +270,7 @@ Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(User user) async* 
                                   ),
                                 ),
                                 const SizedBox(height: 10),
-                                _GlassCard(
-                                  child: Column(
-                                    children: [
-                                      _SettingTile(
-                                        icon: Icons.bookmark_rounded,
-                                        title: 'บุ๊กมาร์กของฉัน',
-                                        subtitle: 'รายการสถานที่ที่บันทึกไว้',
-                                        onTap: () {
-                                          // TODO: นำทางไปหน้าบุ๊กมาร์กของคุณ
-                                        },
-                                      ),
-                                      
-                                      const Divider(height: 0, color: Colors.white12),
-                                      _SettingTile(
-                                        icon: Icons.privacy_tip_rounded,
-                                        title: 'ความเป็นส่วนตัว',
-                                        subtitle: 'จัดการข้อมูลและสิทธิ์',
-                                        onTap: () {
-                                          // TODO: ไปหน้าความเป็นส่วนตัว
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                               
                                 const SizedBox(height: 16),
                                 _GlassCard(
                                   child: ListTile(
@@ -308,7 +281,14 @@ Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(User user) async* 
                                         style: TextStyle(color: Colors.white70)),
                                     onTap: () async {
                                       try {
-                                        await _auth.signOut();
+                                        // ✅ ออกจากระบบแบบครบ (Firebase + Google ถ้าเคยใช้)
+                                        await AuthService().signOut();
+                                        if (!mounted) return;
+                                        // ✅ ล้าง navigation stack แล้วพากลับหน้า Login
+                                        Navigator.of(context).pushAndRemoveUntil(
+                                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                                          (route) => false,
+                                        );
                                       } catch (e) {
                                         if (!mounted) return;
                                         ScaffoldMessenger.of(context).showSnackBar(
@@ -354,39 +334,6 @@ class _GlassCard extends StatelessWidget {
         ],
       ),
       child: child,
-    );
-  }
-}
-class _SettingTile extends StatelessWidget {
-  const _SettingTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(.14),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withOpacity(.18)),
-        ),
-        child: Icon(icon, color: Colors.white),
-      ),
-      title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-      subtitle: Text(subtitle, style: const TextStyle(color: Colors.white70)),
-      trailing: const Icon(Icons.chevron_right, color: Colors.white70),
-      onTap: onTap,
     );
   }
 }

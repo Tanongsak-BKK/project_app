@@ -9,9 +9,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-
 // ถ้า enum Region อยู่ใน model ของคุณ
 import 'package:project_app/model/place.dart' show Region;
+
+// << NEW: หน้าเลือกแผนที่
+import 'package:project_app/screen/maps_screen.dart';
 
 class AddCardScreen extends StatefulWidget {
   const AddCardScreen({super.key});
@@ -33,6 +35,9 @@ class _AddCardScreenState extends State<AddCardScreen> {
   bool _saving = false;
   bool _uploading = false;
   double _uploadProgress = 0;
+
+  // << NEW: เก็บผลจากหน้าแผนที่ เพื่อแสดงสรุป
+  MapPickResult? _pickedMap;
 
   @override
   void dispose() {
@@ -60,13 +65,13 @@ class _AddCardScreenState extends State<AddCardScreen> {
   /// บีบอัดภาพ (มือถือจะเห็นผลมากที่สุด)
   Future<Uint8List> _compressBytes(Uint8List data) async {
     if (kIsWeb) {
-      // เว็บ: ข้ามการบีบอัด (หลาย ๆ ตัวเลือกบนเว็บไม่รองรับง่าย ๆ)
+      // เว็บ: ข้ามการบีบอัด
       return data;
     }
     final out = await FlutterImageCompress.compressWithList(
       data,
-      quality: 68,       // ปรับได้ 60–75
-      minWidth: 960,     // กำหนดความกว้างสูงสุด (พอสำหรับการแสดงผล)
+      quality: 68,
+      minWidth: 960,
       format: CompressFormat.jpeg,
     );
     return out;
@@ -78,7 +83,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 72,  // ลดที่ชั้น image_picker ก่อน (mobile)
+        imageQuality: 72,
         maxWidth: 1024,
       );
       if (picked == null) return;
@@ -88,7 +93,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
         _uploadProgress = 0;
       });
 
-      // อ่านเป็น bytes แล้วบีบอัดอีกชั้น
       final rawBytes = await picked.readAsBytes();
       final bytes = await _compressBytes(rawBytes);
 
@@ -134,59 +138,75 @@ class _AddCardScreenState extends State<AddCardScreen> {
     }
   }
 
+  // << NEW: เปิดหน้าแผนที่ แล้วรับค่ากลับมาวางที่ address
+  Future<void> _pickAddressOnMap() async {
+    final res = await Navigator.push<MapPickResult>(
+      context,
+      MaterialPageRoute(builder: (_) => const MapsScreen()),
+    );
+    if (res != null) {
+      setState(() {
+        _pickedMap = res;
+        final addr = (res.address.isNotEmpty)
+            ? res.address
+            : '${res.lat.toStringAsFixed(6)}, ${res.lng.toStringAsFixed(6)}';
+        _addressCtrl.text = addr; // บันทึกลง field 'address' เดิม
+      });
+    }
+  }
+
   Future<void> _savePlace() async {
-  if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
-  // เช็คล็อกอินก่อน
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนบันทึก')),
-    );
-    return;
+    // เช็คล็อกอินก่อน
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนบันทึก')),
+      );
+      return;
+    }
+
+    final title = _titleCtrl.text.trim();
+    final description = _descCtrl.text.trim();
+    final imageUrl = _imageUrlCtrl.text.trim();
+    final address = _addressCtrl.text.trim(); // << ใช้ค่าจากปุ่มเลือกแผนที่
+    final ratingStr = _ratingCtrl.text.trim();
+
+    double rating = 4.5;
+    final parsed = double.tryParse(ratingStr);
+    if (parsed != null) rating = parsed.clamp(0, 5);
+
+    setState(() => _saving = true);
+    try {
+      final doc = FirebaseFirestore.instance.collection('places').doc();
+      await doc.set({
+        'id': doc.id,
+        'userId': user.uid,
+        'title': title,
+        'description': description,
+        'imageUrl': imageUrl,
+        'address': address,
+        'region': _regionToKey(_region),
+        'rating': rating,
+        'popularity': 0,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('บันทึกสถานที่เรียบร้อย')),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
-
-  final title = _titleCtrl.text.trim();
-  final description = _descCtrl.text.trim();
-  final imageUrl = _imageUrlCtrl.text.trim();
-  final address = _addressCtrl.text.trim();
-  final ratingStr = _ratingCtrl.text.trim();
-
-  double rating = 4.5;
-  final parsed = double.tryParse(ratingStr);
-  if (parsed != null) rating = parsed.clamp(0, 5);
-
-  setState(() => _saving = true);
-  try {
-    final doc = FirebaseFirestore.instance.collection('places').doc();
-    await doc.set({
-      'id': doc.id,
-      'userId': user.uid,                  // << สำคัญ: ผูกเจ้าของเอกสาร
-      'title': title,
-      'description': description,
-      'imageUrl': imageUrl,
-      'address': address,
-      'region': _regionToKey(_region),
-      'rating': rating,
-      'popularity': 0,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('บันทึกสถานที่เรียบร้อย')),
-    );
-    Navigator.pop(context, true);
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')));
-  } finally {
-    if (mounted) setState(() => _saving = false);
-  }
-}
-
 
   InputDecoration _dec({
     required String hint,
@@ -312,12 +332,81 @@ class _AddCardScreenState extends State<AddCardScreen> {
                                   (v == null || v.trim().isEmpty) ? 'กรุณากรอกชื่อสถานที่' : null,
                               textInputAction: TextInputAction.next,
                             ),
+
                             const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _addressCtrl,
-                              decoration: _dec(hint: 'ที่อยู่/พิกัด (ถ้ามี)', icon: Icons.map_rounded),
-                              textInputAction: TextInputAction.next,
+
+                            // ===== NEW: ปุ่มเลือกตำแหน่งจากแผนที่ + กล่องแสดงผล =====
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('ที่อยู่/พิกัด', style: Theme.of(context).textTheme.bodyMedium),
                             ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: _pickAddressOnMap,
+                                    icon: const Icon(Icons.map_outlined),
+                                    label: const Text('เลือกจากแผนที่'),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (_pickedMap != null) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F7F5),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.black.withOpacity(.05)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.place, size: 18, color: Color(0xFF2F6F4F)),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            _addressCtrl.text,
+                                            maxLines: 2, overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'พิกัด: '
+                                      '${_pickedMap!.lat.toStringAsFixed(6)}, '
+                                      '${_pickedMap!.lng.toStringAsFixed(6)}',
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else ...[
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFDFDFD),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.black.withOpacity(.05)),
+                                ),
+                                child: const Text('ยังไม่ได้เลือกตำแหน่งจากแผนที่'),
+                              ),
+                            ],
+                            // ===== END NEW =====
+
                             const SizedBox(height: 10),
                             DropdownButtonFormField<Region>(
                               value: _region,

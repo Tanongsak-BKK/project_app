@@ -4,49 +4,58 @@ import '../service/place_service.dart';
 import '../service/place_service_firebase.dart';
 
 class PlaceProvider extends ChangeNotifier {
-  final PlaceService _service;
-  PlaceProvider({PlaceService? service}) : _service = service ?? PlaceServiceFirebase();
+  final PlaceService _service = PlaceServiceFirebase();
 
   List<Place> _places = [];
-  bool _loading = false;
+  bool _isLoading = false;
   String? _error;
 
-  // --- bookmarks (เก็บเฉพาะ id, ยังไม่ persist) ---
-  final Set<String> _bookmarks = {};
+  // เก็บสถานะ bookmark แยกเป็นเซ็ตของ id (ไม่ผูกที่โมเดล)
+  final Set<String> _bookmarkedIds = <String>{};
 
   List<Place> get places => _places;
-  bool get isLoading => _loading;
+  bool get isLoading => _isLoading;
   String? get error => _error;
 
   Future<void> loadPlaces() async {
-    _loading = true; _error = null; notifyListeners();
+    _isLoading = true;
+    notifyListeners();
     try {
       _places = await _service.fetchPlaces();
+      _error = null;
     } catch (e) {
       _error = e.toString();
     } finally {
-      _loading = false; notifyListeners();
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  // Filter ตาม region
+  /// ✅ ลบจาก state โดยไม่แตะ Firestore (ใช้คู่กับการลบ Firestore ภายนอก)
+  void removeById(String id) {
+    _places.removeWhere((p) => p.id == id);
+    _bookmarkedIds.remove(id); // เคลียร์บุ๊กมาร์กของรายการที่ถูกลบ
+    notifyListeners();
+    // ไม่เรียก fetch ใหม่ เพื่อให้ UI เร็วและไม่กระพริบ
+  }
+
+  /* -------------------- Helpers used by UI -------------------- */
+
   List<Place> byRegion(Region r) => _places.where((p) => p.region == r).toList();
 
-  // --- bookmark helpers ---
-  bool isBookmarked(String id) => _bookmarks.contains(id);
+  List<Place> bookmarked() => _places.where((p) => _bookmarkedIds.contains(p.id)).toList();
+
+  List<Place> bookmarkedByRegion(Region r) =>
+      _places.where((p) => _bookmarkedIds.contains(p.id) && p.region == r).toList();
+
+  bool isBookmarked(String id) => _bookmarkedIds.contains(id);
 
   void toggleBookmark(String id) {
-    if (_bookmarks.contains(id)) {
-      _bookmarks.remove(id);
+    if (_bookmarkedIds.contains(id)) {
+      _bookmarkedIds.remove(id);
     } else {
-      _bookmarks.add(id);
+      _bookmarkedIds.add(id);
     }
     notifyListeners();
   }
-
-  List<Place> bookmarked() =>
-      _places.where((p) => _bookmarks.contains(p.id)).toList();
-
-  List<Place> bookmarkedByRegion(Region r) =>
-      _places.where((p) => p.region == r && _bookmarks.contains(p.id)).toList();
 }
