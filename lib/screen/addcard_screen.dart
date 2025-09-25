@@ -1,10 +1,8 @@
 // lib/screen/addcard_screen.dart
-import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:project_app/screen/navbar_screen.dart';
 
@@ -55,17 +53,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
       case Region.west:
         return 'west';
     }
-  }
-
-  Future<Uint8List> _compressBytes(Uint8List data) async {
-    if (kIsWeb) return data;
-    final out = await FlutterImageCompress.compressWithList(
-      data,
-      quality: 68,
-      minWidth: 960,
-      format: CompressFormat.jpeg,
-    );
-    return out;
   }
 
   Future<void> _pickAddressOnMap() async {
