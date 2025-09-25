@@ -94,7 +94,7 @@ class _DetailScreenState extends State<DetailScreen> {
       return;
     }
 
-    double temp = 3.0;
+    double temp = (_liveRating > 0 ? _liveRating : 3.0);
     final val = await showModalBottomSheet<double>(
       context: context,
       showDragHandle: true,
@@ -191,14 +191,12 @@ class _DetailScreenState extends State<DetailScreen> {
     required String commentId,
     required Map<String, dynamic> data,
   }) async {
-    // ต้องมี user
     if (_user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อน')),
       );
       return;
     }
-    // ปลอดภัยอีกชั้น: ถ้าไม่ใช่ของเรา ไม่ทำ
     if ((data['userId'] as String?) != _user!.uid) return;
 
     final controller = TextEditingController(text: (data['text'] as String?) ?? '');
@@ -227,12 +225,11 @@ class _DetailScreenState extends State<DetailScreen> {
     }
 
     try {
-      // กฎ require keys.hasOnly([...]) → ส่งฟิลด์ครบชุดกลับไป (userId, displayName, text, createdAt)
       await _commentsCol.doc(commentId).set({
         'userId': data['userId'],
         'displayName': (data['displayName'] ?? _user!.displayName ?? 'ผู้ใช้'),
         'text': newText,
-        'createdAt': data['createdAt'], // ต้องคงค่าเดิม
+        'createdAt': data['createdAt'],
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -562,7 +559,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   ],
                                                 ),
                                               ),
-                                              if (isMe) // ปุ่มแก้/ลบ เฉพาะของฉัน
+                                              if (isMe)
                                                 Row(
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
@@ -705,7 +702,7 @@ class _Stars extends StatelessWidget {
   }
 }
 
-/// ดาวแบบปรับค่าได้ (0.5 step)
+/// ดาวแบบปรับค่าได้ (0.5 step) — เรียงจาก 0.5 → 5.0
 class _StarsInteractive extends StatelessWidget {
   final double value;
   final ValueChanged<double> onChanged;
@@ -713,27 +710,23 @@ class _StarsInteractive extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // สร้าง 5 ปุ่ม แตะเพื่อกำหนดคะแนน (รองรับครึ่งดาว)
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    // สร้าง 10 ตำแหน่ง: 0.5, 1.0, 1.5, ... , 5.0
+    return Wrap(
+      alignment: WrapAlignment.center,
       children: List.generate(10, (i) {
-        final starIndex = i ~/ 2; // 0..4
-        final isHalf = i.isOdd;
-        final current = (starIndex + (isHalf ? 0.5 : 1.0));
-        final filled = value >= current - (isHalf ? 0.0 : 0.5);
+        final rating = (i + 1) * 0.5; // 0.5..5.0
+        final isActive = value + 1e-6 >= rating; // กัน floating error เล็กน้อย
 
-        IconData icon;
-        if (isHalf) {
-          icon = filled ? Icons.star_half : Icons.star_border;
-        } else {
-          icon = filled ? Icons.star : Icons.star_border;
-        }
+        final isWhole = (rating % 1 == 0); // true เมื่อเป็น 1.0, 2.0, ...
+        final IconData icon = isWhole
+            ? (isActive ? Icons.star : Icons.star_border)
+            : (isActive ? Icons.star_half : Icons.star_border);
 
         return InkWell(
-          onTap: () => onChanged(current),
+          onTap: () => onChanged(rating),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Icon(icon, size: 28, color: const Color(0xFFFFD166)),
+            child: Icon(icon, size: 32, color: const Color(0xFFFFD166)),
           ),
         );
       }),

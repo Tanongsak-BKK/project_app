@@ -4,8 +4,6 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:project_app/screen/navbar_screen.dart';
@@ -33,8 +31,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
 
   Region _region = Region.north;
   bool _saving = false;
-  bool _uploading = false;
-  double _uploadProgress = 0;
 
   // เก็บผลจากหน้าแผนที่ เพื่อแสดงสรุป
   MapPickResult? _pickedMap;
@@ -70,80 +66,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
       format: CompressFormat.jpeg,
     );
     return out;
-  }
-  
-
-  Future<void> _pickAndUploadImage() async {
-    
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนอัปโหลด')),
-        );
-        return;
-      }
-
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 72,
-        maxWidth: 1024,
-      );
-      if (picked == null) return;
-
-      setState(() {
-        _uploading = true;
-        _uploadProgress = 0;
-      });
-
-      final rawBytes = await picked.readAsBytes();
-      final bytes = await _compressBytes(rawBytes);
-
-      // เตรียม docId สำหรับผูกกับ storage path
-      final docId = FirebaseFirestore.instance.collection('places').doc().id;
-
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('users/${user.uid}/places/$docId.jpg');
-
-      final uploadTask = ref.putData(
-        bytes,
-        SettableMetadata(
-          contentType: 'image/jpeg',
-          cacheControl: 'public,max-age=3600',
-        ),
-      );
-
-      uploadTask.snapshotEvents.listen((s) {
-        if (s.totalBytes > 0) {
-          setState(() => _uploadProgress = s.bytesTransferred / s.totalBytes);
-        }
-      });
-
-      final snap = await uploadTask.whenComplete(() {});
-      final url = await snap.ref.getDownloadURL();
-
-      _imageUrlCtrl.text = url;
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('อัปโหลดรูปสำเร็จ')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('อัปโหลดรูปไม่สำเร็จ: $e')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _uploading = false;
-          _uploadProgress = 0;
-        });
-      }
-    }
   }
 
   Future<void> _pickAddressOnMap() async {
@@ -281,54 +203,31 @@ class _AddCardScreenState extends State<AddCardScreen> {
                                   ),
                                 ),
                               ),
-                            if (_uploading) ...[
-                              const SizedBox(height: 12),
-                              LinearProgressIndicator(
-                                value: _uploadProgress == 0 ? null : _uploadProgress,
-                              ),
-                            ],
                             const SizedBox(height: 14),
 
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _imageUrlCtrl,
-                                    decoration: _dec(
-                                      hint: 'วาง Image URL (หรือใช้ปุ่มเลือกรูป)',
-                                      icon: Icons.link,
-                                      suffix: (_imageUrlCtrl.text.isEmpty)
-                                          ? null
-                                          : IconButton(
-                                              onPressed: () {
-                                                setState(() => _imageUrlCtrl.clear());
-                                              },
-                                              icon: const Icon(Icons.close),
-                                            ),
-                                    ),
-                                    keyboardType: TextInputType.url,
-                                    onChanged: (_) => setState(() {}),
-                                    validator: (v) {
-                                      if ((v == null || v.trim().isEmpty) && !_uploading) {
-                                        return 'ใส่รูปอย่างน้อย 1 วิธี (URL หรืออัปโหลด)';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                ElevatedButton.icon(
-                                  onPressed: _uploading ? null : _pickAndUploadImage,
-                                  icon: const Icon(Icons.photo_library),
-                                  label: const Text('เลือกรูป'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: const Color(0xFF2F6F4F),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                ),
-                              ],
+                            // 🔹 Text field สำหรับวางลิงก์รูป
+                            TextFormField(
+                              controller: _imageUrlCtrl,
+                              decoration: _dec(
+                                hint: 'วาง Image URL',
+                                icon: Icons.link,
+                                suffix: (_imageUrlCtrl.text.isEmpty)
+                                    ? null
+                                    : IconButton(
+                                        onPressed: () {
+                                          setState(() => _imageUrlCtrl.clear());
+                                        },
+                                        icon: const Icon(Icons.close),
+                                      ),
+                              ),
+                              keyboardType: TextInputType.url,
+                              onChanged: (_) => setState(() {}),
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'กรุณาใส่ลิงก์รูป';
+                                }
+                                return null;
+                              },
                             ),
 
                             const SizedBox(height: 14),
@@ -435,7 +334,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton.icon(
-                                onPressed: _saving || _uploading ? null : _savePlace,
+                                onPressed: _saving ? null : _savePlace,
                                 icon: _saving
                                     ? const SizedBox(
                                         width: 18, height: 18,
