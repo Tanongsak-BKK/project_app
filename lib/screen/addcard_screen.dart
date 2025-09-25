@@ -71,9 +71,20 @@ class _AddCardScreenState extends State<AddCardScreen> {
     );
     return out;
   }
+  
 
   Future<void> _pickAndUploadImage() async {
+    
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนอัปโหลด')),
+        );
+        return;
+      }
+
       final picker = ImagePicker();
       final picked = await picker.pickImage(
         source: ImageSource.gallery,
@@ -90,9 +101,12 @@ class _AddCardScreenState extends State<AddCardScreen> {
       final rawBytes = await picked.readAsBytes();
       final bytes = await _compressBytes(rawBytes);
 
+      // เตรียม docId สำหรับผูกกับ storage path
+      final docId = FirebaseFirestore.instance.collection('places').doc().id;
+
       final ref = FirebaseStorage.instance
           .ref()
-          .child('places/img_${DateTime.now().millisecondsSinceEpoch}.jpg');
+          .child('users/${user.uid}/places/$docId.jpg');
 
       final uploadTask = ref.putData(
         bytes,

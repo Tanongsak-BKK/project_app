@@ -22,10 +22,6 @@ class DefaultFirebaseOptions {
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
-      case TargetPlatform.iOS:
-        return ios;
-      case TargetPlatform.macOS:
-        return macos;
       case TargetPlatform.windows:
         return windows;
       case TargetPlatform.linux:
@@ -47,7 +43,7 @@ class DefaultFirebaseOptions {
     projectId: 'tarvelapp-ed9e7',
     authDomain: 'tarvelapp-ed9e7.firebaseapp.com',
     databaseURL: 'https://tarvelapp-ed9e7-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'tarvelapp-ed9e7.firebasestorage.app',
+    storageBucket: 'tarvelapp-ed9e7.appspot.com',
     measurementId: 'G-FE8WKPQFV2',
   );
 
@@ -57,27 +53,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '928270258852',
     projectId: 'tarvelapp-ed9e7',
     databaseURL: 'https://tarvelapp-ed9e7-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'tarvelapp-ed9e7.firebasestorage.app',
-  );
-
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAFs4oGzP-NHtPZbj77RiRG7WvHiZtITco',
-    appId: '1:928270258852:ios:5c750d9c3fd34052a64c31',
-    messagingSenderId: '928270258852',
-    projectId: 'tarvelapp-ed9e7',
-    databaseURL: 'https://tarvelapp-ed9e7-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'tarvelapp-ed9e7.firebasestorage.app',
-    iosBundleId: 'com.example.projectApp',
-  );
-
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyAFs4oGzP-NHtPZbj77RiRG7WvHiZtITco',
-    appId: '1:928270258852:ios:5c750d9c3fd34052a64c31',
-    messagingSenderId: '928270258852',
-    projectId: 'tarvelapp-ed9e7',
-    databaseURL: 'https://tarvelapp-ed9e7-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'tarvelapp-ed9e7.firebasestorage.app',
-    iosBundleId: 'com.example.projectApp',
+    storageBucket: 'tarvelapp-ed9e7.appspot.com',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
@@ -87,7 +63,7 @@ class DefaultFirebaseOptions {
     projectId: 'tarvelapp-ed9e7',
     authDomain: 'tarvelapp-ed9e7.firebaseapp.com',
     databaseURL: 'https://tarvelapp-ed9e7-default-rtdb.asia-southeast1.firebasedatabase.app',
-    storageBucket: 'tarvelapp-ed9e7.firebasestorage.app',
+    storageBucket: 'tarvelapp-ed9e7.appspot.com',
     measurementId: 'G-DG65RDC9DW',
   );
 }
