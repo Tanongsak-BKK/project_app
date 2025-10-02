@@ -68,9 +68,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             Opacity(
                               opacity: .7,
                               child: Text(
-                                "You're in New York",
+                                "You're in Thailand",
                                 style: theme.textTheme.labelMedium?.copyWith(
-                                  color: const Color.fromARGB(179, 0, 0, 0),
+                                  color: const Color.fromARGB(179, 255, 255, 255),
                                 ),
                               ),
                             ),
