@@ -1,5 +1,6 @@
 // lib/screen/home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'package:project_app/model/place.dart'; // ต้องมี enum Region และ class Place
@@ -7,7 +8,6 @@ import 'package:project_app/provider/place_provider.dart';
 import 'package:project_app/screen/detail_screen.dart';
 
 /* ---------------------- Top-level constants ---------------------- */
-// ย้ายออกมาระดับไฟล์เพื่อให้ใช้งานได้ใน const context ทุกที่อย่างปลอดภัย
 const kCard = Color(0xFF151517);
 const kField = Color(0xFF1A1B1F);
 const kAccent = Color(0xFF2F80ED);
@@ -26,7 +26,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // โหลดข้อมูลครั้งแรก (ถ้า main เรียกอยู่แล้ว ส่วนนี้ไม่เป็นไร จะ merge กันได้)
     Future.microtask(() => context.read<PlaceProvider>().loadPlaces());
   }
 
@@ -41,125 +40,142 @@ class _HomeScreenState extends State<HomeScreen> {
     final prov = context.watch<PlaceProvider>();
     final theme = Theme.of(context);
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("lib/images/background-onboarding.jpg"),
-            fit: BoxFit.cover,
-            alignment: Alignment.topCenter,
-          ),
-        ),
-        child: SafeArea(
-          child: DefaultTabController(
-            length: 5, // ทั้งหมด + 4 ภูมิภาค
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Row(
+    final topPad = MediaQuery.of(context).padding.top;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,       // ✅ โปร่งใสจริง
+        statusBarIconBrightness: Brightness.light, // Android
+        statusBarBrightness: Brightness.dark,      // iOS (light content)
+        systemNavigationBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        extendBody: true,
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 🔹 พื้นหลังรูปเต็มจอ
+            const Positioned.fill(
+              child: Image(
+                image: AssetImage("lib/images/background-onboarding.jpg"),
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+            // 🔹 Overlay ให้อ่านข้อความชัด (ปรับค่าได้)
+            Positioned.fill(
+              child: Container(color: Colors.black.withOpacity(0.25)),
+            ),
+
+            // 🔹 เนื้อหา
+            SafeArea(
+              top: false, // ✅ อย่ากันด้านบน เพื่อให้รูปชนรอยบาก
+              child: DefaultTabController(
+                length: 5, // ทั้งหมด + 4 ภูมิภาค
+                child: Padding(
+                  // ✅ ชดเชยรอยบากเอง
+                  padding: EdgeInsets.fromLTRB(16, topPad + 12, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Opacity(
-                              opacity: .7,
-                              child: Text(
-                                "You're in Thailand",
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: const Color.fromARGB(179, 255, 255, 255),
+                      // Header
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Opacity(
+                                  opacity: .7,
+                                  child: Text(
+                                    "You're in Thailand",
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      color: const Color.fromARGB(179, 255, 255, 255),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  "Let's explore!",
+                                  style: theme.textTheme.headlineSmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              "Let's explore!",
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Search
+                      TextField(
+                        controller: _searchCtrl,
+                        style: const TextStyle(color: Colors.white),
+                        cursorColor: Colors.white70,
+                        decoration: InputDecoration(
+                          hintText: "ค้นหาชื่อสถานที่…",
+                          hintStyle: const TextStyle(color: Colors.white54),
+                          filled: true,
+                          fillColor: kField,
+                          prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                          suffixIcon: (_query.isEmpty)
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white70),
+                                  onPressed: () {
+                                    _searchCtrl.clear();
+                                    setState(() => _query = '');
+                                  },
+                                ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
                         ),
+                        onChanged: (q) => setState(() => _query = q.trim()),
+                        onSubmitted: (q) => setState(() => _query = q.trim()),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // Tabs
+                      const _CategoryTabs(),
+                      const SizedBox(height: 12),
+
+                      // เนื้อหาแท็บ
+                      Expanded(
+                        child: prov.isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : prov.error != null
+                                ? Center(
+                                    child: Text(
+                                      prov.error!,
+                                      style: const TextStyle(color: Colors.white70),
+                                    ),
+                                  )
+                                : TabBarView(
+                                    physics: const BouncingScrollPhysics(),
+                                    children: [
+                                      _AllTab(query: _query), // Pass query here
+                                      _RegionTab(region: Region.north, query: _query),
+                                      _RegionTab(region: Region.south, query: _query),
+                                      _RegionTab(region: Region.east, query: _query),
+                                      _RegionTab(region: Region.west, query: _query),
+                                    ],
+                                  ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-
-                  // Search
-                  TextField(
-                    controller: _searchCtrl,
-                    style: const TextStyle(color: Colors.white),
-                    cursorColor: Colors.white70,
-                    decoration: InputDecoration(
-                      hintText: "ค้นหาชื่อสถานที่…",
-                      hintStyle: const TextStyle(color: Colors.white54),
-                      filled: true,
-                      fillColor: kField,
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        color: Colors.white70,
-                      ),
-                      suffixIcon: (_query.isEmpty)
-                          ? null
-                          : IconButton(
-                              icon: const Icon(
-                                Icons.close,
-                                color: Colors.white70,
-                              ),
-                              onPressed: () {
-                                _searchCtrl.clear();
-                                setState(() => _query = '');
-                              },
-                            ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onChanged: (q) => setState(() => _query = q.trim()),
-                    onSubmitted: (q) => setState(() => _query = q.trim()),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // Tabs
-                  const _CategoryTabs(),
-                  const SizedBox(height: 12),
-
-                  // เนื้อหาแท็บ
-                  Expanded(
-                    child: prov.isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : prov.error != null
-                            ? Center(
-                                child: Text(
-                                  prov.error!,
-                                  style: const TextStyle(color: Colors.white70),
-                                ),
-                              )
-                            : TabBarView(
-                                physics: const BouncingScrollPhysics(),
-                                children: [
-                                  _AllTab(query: _query), // Pass query here
-                                  _RegionTab(region: Region.north, query: _query),
-                                  _RegionTab(region: Region.south, query: _query),
-                                  _RegionTab(region: Region.east, query: _query),
-                                  _RegionTab(region: Region.west, query: _query),
-                                ],
-                              ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -204,12 +220,8 @@ class _RegionTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rawItems = context.select<PlaceProvider, List<Place>>(
-      (p) => p.byRegion(region),
-    );
-    final rawFavs = context.select<PlaceProvider, List<Place>>(
-      (p) => p.bookmarkedByRegion(region),
-    );
+    final rawItems = context.select<PlaceProvider, List<Place>>((p) => p.byRegion(region));
+    final rawFavs = context.select<PlaceProvider, List<Place>>((p) => p.bookmarkedByRegion(region));
 
     final q = (query ?? '').trim().toLowerCase();
     bool matches(Place p) => q.isEmpty || p.title.toLowerCase().contains(q);
@@ -218,11 +230,8 @@ class _RegionTab extends StatelessWidget {
     final favs = rawFavs.where(matches).toList();
 
     if (items.isEmpty && favs.isEmpty) {
-      return Center(
-        child: Text(
-          q.isEmpty ? 'ยังไม่มีข้อมูลในหมวดนี้' : 'ไม่พบผลลัพธ์สำหรับ “$q”',
-          style: const TextStyle(color: Colors.white70),
-        ),
+      return const Center(
+        child: Text('ยังไม่มีข้อมูลในหมวดนี้', style: TextStyle(color: Colors.white70)),
       );
     }
 
@@ -252,11 +261,7 @@ class _RegionTab extends StatelessWidget {
             children: [
               Text(
                 "Popular",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
               ),
               Spacer(),
             ],
@@ -305,11 +310,8 @@ class _AllTab extends StatelessWidget {
     final favs = prov.bookmarked().where(matches).toList();
 
     if (items.isEmpty && favs.isEmpty) {
-      return Center(
-        child: Text(
-          q.isEmpty ? 'ยังไม่มีข้อมูล' : 'ไม่พบผลลัพธ์สำหรับ “$q”',
-          style: const TextStyle(color: Colors.white70),
-        ),
+      return const Center(
+        child: Text('ยังไม่มีข้อมูล', style: TextStyle(color: Colors.white70)),
       );
     }
 
@@ -339,11 +341,7 @@ class _AllTab extends StatelessWidget {
             children: [
               Text(
                 "Popular",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
               ),
               Spacer(),
             ],
@@ -398,10 +396,7 @@ class _PlaceCard extends StatelessWidget {
               errorBuilder: (_, __, ___) => Container(
                 color: Colors.black26,
                 alignment: Alignment.center,
-                child: const Icon(
-                  Icons.image_not_supported,
-                  color: Colors.white54,
-                ),
+                child: const Icon(Icons.image_not_supported, color: Colors.white54),
               ),
             ),
           ),
@@ -413,11 +408,7 @@ class _PlaceCard extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.transparent,
-                      Colors.black54,
-                    ],
+                    colors: [Colors.transparent, Colors.transparent, Colors.black54],
                   ),
                 ),
               ),
@@ -454,13 +445,12 @@ class _PlaceCard extends StatelessWidget {
               child: InkWell(
                 onTap: () => Navigator.push(
                   context,
-                  // ✅ ปรับให้ตรงกับ DetailScreen ใหม่ (ส่งเฉพาะ place)
                   MaterialPageRoute(builder: (_) => DetailScreen(place: place)),
                 ),
               ),
             ),
           ),
-          // ปุ่มบุ๊กมาร์ก (อยู่บนสุด)
+          // ปุ่มบุ๊กมาร์ก
           Positioned(
             top: 10,
             right: 10,
@@ -472,12 +462,8 @@ class _PlaceCard extends StatelessWidget {
               child: IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.all(6),
-                icon: Icon(
-                  isSaved ? Icons.bookmark : Icons.bookmark_border,
-                  color: Colors.white,
-                ),
-                onPressed: () =>
-                    context.read<PlaceProvider>().toggleBookmark(place.id),
+                icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border, color: Colors.white),
+                onPressed: () => context.read<PlaceProvider>().toggleBookmark(place.id),
               ),
             ),
           ),
@@ -496,7 +482,6 @@ class _PopularTile extends StatelessWidget {
   void _openDetail(BuildContext context) {
     Navigator.push(
       context,
-      // ✅ ปรับให้ตรงกับ DetailScreen ใหม่ (ส่งเฉพาะ place)
       MaterialPageRoute(builder: (_) => DetailScreen(place: place)),
     );
   }
@@ -508,12 +493,11 @@ class _PopularTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _openDetail(context), // แตะทั้งแถบไป detail
+        onTap: () => _openDetail(context),
         child: SizedBox(
-          height: 110, // ให้ตรงกับส่วนที่กำหนดใน ListView
+          height: 110,
           child: Row(
             children: [
-              // รูปซ้ายเต็มช่อง
               ClipRRect(
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(14),
@@ -528,18 +512,12 @@ class _PopularTile extends StatelessWidget {
                     errorBuilder: (_, __, ___) => Container(
                       color: Colors.black26,
                       alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.image_not_supported,
-                        color: Colors.white54,
-                      ),
+                      child: const Icon(Icons.image_not_supported, color: Colors.white54),
                     ),
                   ),
                 ),
               ),
-
               const SizedBox(width: 12),
-
-              // ข้อความ
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
@@ -551,26 +529,16 @@ class _PopularTile extends StatelessWidget {
                         place.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(
-                            Icons.star,
-                            size: 14,
-                            color: Color(0xFFFFD166),
-                          ),
+                          const Icon(Icons.star, size: 14, color: Color(0xFFFFD166)),
                           const SizedBox(width: 4),
                           Text(
                             place.rating.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
                           ),
                         ],
                       ),
@@ -578,8 +546,6 @@ class _PopularTile extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // ลูกศร -> ไปหน้า detail เหมือนกัน
               IconButton(
                 icon: const Icon(Icons.chevron_right, color: Colors.white70),
                 onPressed: () => _openDetail(context),
@@ -614,10 +580,7 @@ class _Stars extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           rating.toStringAsFixed(1),
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
       ],
     );

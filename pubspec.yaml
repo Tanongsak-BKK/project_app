@@ -44,6 +44,7 @@ dependencies:
   # เลือกเวอร์ชันเดียวเท่านั้น ห้ามซ้ำ
   image_picker: ^1.1.2          # ⬅️ คงเหลือเวอร์ชันนี้ (ลบบรรทัด ^1.0.7 ออก)
   google_maps_flutter_web: ^0.5.14+2
+  device_preview_plus: ^2.5.0
 
 dev_dependencies:
   flutter_test:

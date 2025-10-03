@@ -1,18 +1,26 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:device_preview/device_preview.dart';
+import 'package:device_preview_plus/device_preview_plus.dart';
 
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // ต้องมีไฟล์นี้จาก flutterfire configure
+import 'firebase_options.dart';
 
 import 'package:project_app/provider/place_provider.dart';
 import 'AuthGate.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ ต้อง init Firebase ก่อนใช้ AuthGate/FirebaseAuth ทุกครั้ง (สำคัญมากโดยเฉพาะบน Web)
+  // ทำให้จอแสดงผลเต็ม (edge-to-edge) + status bar โปร่งใส
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Color.fromARGB(0, 0, 0, 0),
+    systemNavigationBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light, // Android
+    statusBarBrightness: Brightness.dark,      // iOS
+  ));
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -33,14 +41,59 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      useInheritedMediaQuery: true,
-      builder: DevicePreview.appBuilder,
-      locale: DevicePreview.locale(context),
-      title: 'Travel App',
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: const Color(0xFF2F80ED)),
-      home: const AuthGate(), // ใช้ AuthGate ได้เพราะ init Firebase แล้ว
-    );
+    // ✅ fallback ตรวจด้วย try-catch
+    bool hasUseInheritedMediaQuery = false;
+    try {
+      // ถ้า property นี้มีใน MaterialApp → จะไม่ throw
+      MaterialApp(useInheritedMediaQuery: true);
+      hasUseInheritedMediaQuery = true;
+    } catch (_) {
+      hasUseInheritedMediaQuery = false;
+    }
+
+    if (hasUseInheritedMediaQuery) {
+      // ---------------------------
+      // Flutter SDK ใหม่ (>=2.10)
+      // ---------------------------
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        useInheritedMediaQuery: true,
+        builder: DevicePreview.appBuilder,
+        locale: DevicePreview.locale(context),
+        title: 'Travel App',
+        theme: ThemeData(
+          useMaterial3: true,
+          colorSchemeSeed: const Color(0xFF2F80ED),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            systemOverlayStyle: SystemUiOverlayStyle.light,
+          ),
+        ),
+        home: const AuthGate(),
+      );
+    } else {
+      // ---------------------------
+      // Flutter SDK เก่า (<2.10)
+      // ---------------------------
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        builder: (context, child) {
+          return DevicePreview.appBuilder(context, child);
+        },
+        locale: DevicePreview.locale(context),
+        title: 'Travel App',
+        theme: ThemeData(
+          useMaterial3: true,
+          colorSchemeSeed: const Color(0xFF2F80ED),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            systemOverlayStyle: SystemUiOverlayStyle.light,
+          ),
+        ),
+        home: const AuthGate(),
+      );
+    }
   }
 }

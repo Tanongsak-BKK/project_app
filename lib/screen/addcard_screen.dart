@@ -1,6 +1,8 @@
 // lib/screen/addcard_screen.dart
+// ✨ Natural-themed visual polish only — no business logic changed.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ✅ คุม status bar
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -106,9 +108,8 @@ class _AddCardScreenState extends State<AddCardScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('บันทึกสถานที่เรียบร้อย')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('บันทึกสถานที่เรียบร้อย')));
 
       // ไปที่ NavbarScreen (มี HomeScreen อยู่ข้างใน)
       Navigator.of(context).pushAndRemoveUntil(
@@ -124,231 +125,363 @@ class _AddCardScreenState extends State<AddCardScreen> {
     }
   }
 
-  InputDecoration _dec({
-    required String hint,
-    IconData? icon,
-    Widget? suffix,
-  }) {
+  // ---------- Nature-flavored UI helpers (visual-only) ----------
+
+  static const _nature = Color(0xFF2F6F4F); // leaf
+  static const _natureSoft = Color(0xFFF3F7F5); // mist
+
+  InputDecoration _dec({required String hint, IconData? icon, Widget? suffix}) {
     return InputDecoration(
       hintText: hint,
-      prefixIcon: icon != null ? Icon(icon, color: const Color(0xFF2F6F4F)) : null,
+      prefixIcon: icon != null ? Icon(icon, color: _nature) : null,
       suffixIcon: suffix,
       filled: true,
-      fillColor: const Color(0xFFF3F7F5),
+      fillColor: _natureSoft,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.black.withOpacity(.05)),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: const Color(0xFFFFFFFF).withOpacity(.06)),
       ),
-      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: const Color(0xFFFFFFFF).withOpacity(.06)),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(14)),
+        borderSide: BorderSide(color: _nature, width: 1.2),
+      ),
+      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+    );
+  }
+
+  Widget _sectionTitle(String text, {IconData icon = Icons.eco_rounded}) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: _nature),
+        const SizedBox(width: 8),
+        Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [Color(0xFF0f9b0f), Color(0xFF3acfd5), Color(0xFF3a7bd5)],
-            stops: [0.0, 0.5, 1.0],
-          ),
-        ),
-        child: SafeArea(
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              SliverAppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                pinned: true,
-                title: const Text('เพิ่มสถานที่', style: TextStyle(color: Colors.white)),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // ✅ บังคับ status bar โปร่งใสและไอคอนสว่าง เฉพาะหน้านี้
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light, // Android
+        statusBarBrightness: Brightness.dark,      // iOS (light)
+        systemNavigationBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        // ✅ ให้คอนเทนต์ล้นหลัง status bar จริง ๆ
+        extendBodyBehindAppBar: true,
+        extendBody: true,
+        backgroundColor: Colors.transparent,
+
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 🔹 พื้นหลังรูปเต็มจอ
+            Positioned.fill(
+              child: Image.asset(
+                'lib/images/background-onboarding.jpg', // ใช้ path ของคุณ
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter, // ดันรูปชิดบน จะไม่เหลือเส้นสีอ่อน
+                filterQuality: FilterQuality.high,
               ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  child: _GlassCard(
+            ),
+
+            // 🔹 Overlay โปร่ง เพื่อให้อ่านข้อความชัดขึ้น
+            Positioned.fill(
+              child: Container(color: Colors.black.withOpacity(0.25)),
+            ),
+
+            // 🔹 เนื้อหา — ปิด SafeArea ด้านบนเพื่อไม่ให้เกิดขอบขาว
+            SafeArea(
+              top: false, // ✅ สำคัญ! ไม่กันด้านบน (ภาพจะชิดรอยบากจริง ๆ)
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          children: [
-                            if (_imageUrlCtrl.text.isNotEmpty)
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: AspectRatio(
-                                  aspectRatio: 16 / 9,
-                                  child: Image.network(
-                                    _imageUrlCtrl.text,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      color: Colors.black12,
-                                      alignment: Alignment.center,
-                                      child: const Icon(Icons.image_not_supported, color: Colors.black45),
+                      // ชดเชยระยะรอยบากด้วย media padding เอง
+                      padding: EdgeInsets.only(
+                        top: MediaQuery.of(context).padding.top + 12,
+                        left: 16,
+                        right: 16,
+                        bottom: 28,
+                      ),
+                      child: _GlassCard(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Header row
+                                Row(
+                                  children: [
+                                    const Icon(Icons.terrain_rounded,
+                                        color: Colors.white, size: 18),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'บันทึกสถานที่ท่องเที่ยว',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(fontWeight: FontWeight.w700),
+                                    ),
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(.65),
+                                        borderRadius: BorderRadius.circular(24),
+                                        border: Border.all(
+                                            color: Colors.black.withOpacity(.8)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.eco_outlined,
+                                              size: 14, color: Colors.white),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            _regionLabel(_region),
+                                            style: const TextStyle(
+                                                fontSize: 12, color: Colors.white),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 14),
+
+                                // Preview รูปจาก URL
+                                if (_imageUrlCtrl.text.isNotEmpty)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: AspectRatio(
+                                      aspectRatio: 16 / 9,
+                                      child: AnimatedSwitcher(
+                                        duration: const Duration(milliseconds: 250),
+                                        child: Image.network(
+                                          _imageUrlCtrl.text,
+                                          key: ValueKey(_imageUrlCtrl.text),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            color: Colors.white,
+                                            alignment: Alignment.center,
+                                            child: const Icon(
+                                              Icons.image_not_supported,
+                                              color: Color(0xFFF0F0F0),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
+
+                                const SizedBox(height: 14),
+                                _sectionTitle('รูปภาพ'),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _imageUrlCtrl,
+                                  decoration: _dec(
+                                    hint: 'วาง Image URL',
+                                    icon: Icons.link,
+                                    suffix: (_imageUrlCtrl.text.isEmpty)
+                                        ? null
+                                        : Tooltip(
+                                            message: 'ล้างลิงก์',
+                                            child: IconButton(
+                                              onPressed: () {
+                                                setState(() => _imageUrlCtrl.clear());
+                                              },
+                                              icon: const Icon(Icons.close),
+                                            ),
+                                          ),
+                                  ),
+                                  keyboardType: TextInputType.url,
+                                  onChanged: (_) => setState(() {}),
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) {
+                                      return 'กรุณาใส่ลิงก์รูป';
+                                    }
+                                    return null;
+                                  },
                                 ),
-                              ),
-                            const SizedBox(height: 14),
 
-                            // 🔹 Text field สำหรับวางลิงก์รูป
-                            TextFormField(
-                              controller: _imageUrlCtrl,
-                              decoration: _dec(
-                                hint: 'วาง Image URL',
-                                icon: Icons.link,
-                                suffix: (_imageUrlCtrl.text.isEmpty)
-                                    ? null
-                                    : IconButton(
-                                        onPressed: () {
-                                          setState(() => _imageUrlCtrl.clear());
-                                        },
-                                        icon: const Icon(Icons.close),
+                                const SizedBox(height: 16),
+                                _sectionTitle('รายละเอียดสถานที่',
+                                    icon: Icons.place_rounded),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _titleCtrl,
+                                  decoration: _dec(
+                                      hint: 'ชื่อสถานที่',
+                                      icon: Icons.place_rounded),
+                                  validator: (v) => (v == null || v.trim().isEmpty)
+                                      ? 'กรุณากรอกชื่อสถานที่'
+                                      : null,
+                                  textInputAction: TextInputAction.next,
+                                ),
+
+                                const SizedBox(height: 16),
+                                _sectionTitle('ที่อยู่ / พิกัด',
+                                    icon: Icons.map_outlined),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: _pickAddressOnMap,
+                                        icon: const Icon(Icons.map_outlined),
+                                        label: const Text('เลือกจากแผนที่'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                          side: const BorderSide(color: Color(0xFFF5F5F5)),
+                                          padding: const EdgeInsets.symmetric(vertical: 14),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          backgroundColor:
+                                              const Color(0xFFF9FFFC).withOpacity(.06),
+                                        ),
                                       ),
-                              ),
-                              keyboardType: TextInputType.url,
-                              onChanged: (_) => setState(() {}),
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'กรุณาใส่ลิงก์รูป';
-                                }
-                                return null;
-                              },
-                            ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                if (_pickedMap != null) ...[
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: _natureSoft,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.black.withOpacity(.05)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.place,
+                                                size: 18, color: Colors.white),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                _addressCtrl.text,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'พิกัด: '
+                                          '${_pickedMap!.lat.toStringAsFixed(6)}, '
+                                          '${_pickedMap!.lng.toStringAsFixed(6)}',
+                                          style: Theme.of(context).textTheme.bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ] else ...[
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFDFDFD),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.black.withOpacity(.05)),
+                                    ),
+                                    child: const Text('ยังไม่ได้เลือกตำแหน่งจากแผนที่'),
+                                  ),
+                                ],
 
-                            const SizedBox(height: 14),
-                            TextFormField(
-                              controller: _titleCtrl,
-                              decoration: _dec(hint: 'ชื่อสถานที่', icon: Icons.place_rounded),
-                              validator: (v) =>
-                                  (v == null || v.trim().isEmpty) ? 'กรุณากรอกชื่อสถานที่' : null,
-                              textInputAction: TextInputAction.next,
-                            ),
+                                const SizedBox(height: 16),
+                                _sectionTitle('ภูมิภาค', icon: Icons.forest_rounded),
+                                const SizedBox(height: 8),
+                                DropdownButtonFormField<Region>(
+                                  value: _region,
+                                  decoration: _dec(hint: 'ภูมิภาค'),
+                                  items: const [
+                                    DropdownMenuItem(value: Region.north, child: Text('เหนือ')),
+                                    DropdownMenuItem(value: Region.south, child: Text('ใต้')),
+                                    DropdownMenuItem(value: Region.east, child: Text('ตะวันออก')),
+                                    DropdownMenuItem(value: Region.west, child: Text('ตะวันตก')),
+                                  ],
+                                  onChanged: (v) => setState(() => _region = v ?? Region.north),
+                                ),
 
-                            const SizedBox(height: 10),
+                                const SizedBox(height: 16),
+                                _sectionTitle('คำอธิบาย', icon: Icons.notes_rounded),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _descCtrl,
+                                  decoration: _dec(
+                                      hint: 'คำอธิบาย/ไฮไลต์', icon: Icons.notes_rounded),
+                                  maxLines: 4,
+                                ),
 
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text('ที่อยู่/พิกัด', style: Theme.of(context).textTheme.bodyMedium),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: _pickAddressOnMap,
-                                    icon: const Icon(Icons.map_outlined),
-                                    label: const Text('เลือกจากแผนที่'),
-                                    style: OutlinedButton.styleFrom(
+                                const SizedBox(height: 22),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: _saving ? null : _savePlace,
+                                    icon: _saving
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          )
+                                        : const Icon(Icons.save_outlined),
+                                    label: const Text('บันทึกสถานที่'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _nature,
+                                      foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(vertical: 14),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
+                                      elevation: 0,
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            if (_pickedMap != null) ...[
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF3F7F5),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.black.withOpacity(.05)),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.place, size: 18, color: Color(0xFF2F6F4F)),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            _addressCtrl.text,
-                                            maxLines: 2, overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      'พิกัด: '
-                                      '${_pickedMap!.lat.toStringAsFixed(6)}, '
-                                      '${_pickedMap!.lng.toStringAsFixed(6)}',
-                                      style: Theme.of(context).textTheme.bodySmall,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ] else ...[
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFDFDFD),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.black.withOpacity(.05)),
-                                ),
-                                child: const Text('ยังไม่ได้เลือกตำแหน่งจากแผนที่'),
-                              ),
-                            ],
-
-                            const SizedBox(height: 10),
-                            DropdownButtonFormField<Region>(
-                              value: _region,
-                              decoration: _dec(hint: 'ภูมิภาค'),
-                              items: const [
-                                DropdownMenuItem(value: Region.north, child: Text('เหนือ')),
-                                DropdownMenuItem(value: Region.south, child: Text('ใต้')),
-                                DropdownMenuItem(value: Region.east,  child: Text('ตะวันออก')),
-                                DropdownMenuItem(value: Region.west,  child: Text('ตะวันตก')),
-                              ],
-                              onChanged: (v) => setState(() => _region = v ?? Region.north),
-                            ),
-
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _descCtrl,
-                              decoration: _dec(hint: 'คำอธิบาย/ไฮไลต์', icon: Icons.notes_rounded),
-                              maxLines: 4,
-                            ),
-                            const SizedBox(height: 18),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: _saving ? null : _savePlace,
-                                icon: _saving
-                                    ? const SizedBox(
-                                        width: 18, height: 18,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      )
-                                    : const Icon(Icons.save_outlined),
-                                label: const Text('บันทึกสถานที่'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2F6F4F),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  static String _regionLabel(Region r) {
+    switch (r) {
+      case Region.north:
+        return 'ภาคเหนือ';
+      case Region.south:
+        return 'ภาคใต้';
+      case Region.east:
+        return 'ตะวันออก';
+      case Region.west:
+        return 'ตะวันตก';
+    }
   }
 }
 
@@ -362,13 +495,13 @@ class _GlassCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(.12),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withOpacity(.15)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.2),
-            blurRadius: 10,
-            offset: const Offset(0, 6),
+            color: Colors.black.withOpacity(.20),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
