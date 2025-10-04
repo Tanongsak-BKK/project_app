@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:project_app/model/place.dart'; // ต้องมี enum Region และ class Place
 import 'package:project_app/provider/place_provider.dart';
@@ -26,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // โหลดจาก Provider ตามเดิม
     Future.microtask(() => context.read<PlaceProvider>().loadPlaces());
   }
 
@@ -39,12 +41,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final prov = context.watch<PlaceProvider>();
     final theme = Theme.of(context);
-
     final topPad = MediaQuery.of(context).padding.top;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,       // ✅ โปร่งใสจริง
+        statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light, // Android
         statusBarBrightness: Brightness.dark,      // iOS (light content)
         systemNavigationBarColor: Colors.transparent,
@@ -65,18 +66,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 filterQuality: FilterQuality.high,
               ),
             ),
-            // 🔹 Overlay ให้อ่านข้อความชัด (ปรับค่าได้)
+            // 🔹 Overlay ให้อ่านข้อความชัด
             Positioned.fill(
               child: Container(color: Colors.black.withOpacity(0.25)),
             ),
 
             // 🔹 เนื้อหา
             SafeArea(
-              top: false, // ✅ อย่ากันด้านบน เพื่อให้รูปชนรอยบาก
+              top: false,
               child: DefaultTabController(
                 length: 5, // ทั้งหมด + 4 ภูมิภาค
                 child: Padding(
-                  // ✅ ชดเชยรอยบากเอง
+                  // ชดเชยรอยบากเอง เพื่อให้หัวชนภาพ
                   padding: EdgeInsets.fromLTRB(16, topPad + 12, 16, 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,25 +151,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       // เนื้อหาแท็บ
                       Expanded(
-                        child: prov.isLoading
-                            ? const Center(child: CircularProgressIndicator())
-                            : prov.error != null
-                                ? Center(
-                                    child: Text(
-                                      prov.error!,
-                                      style: const TextStyle(color: Colors.white70),
-                                    ),
-                                  )
-                                : TabBarView(
-                                    physics: const BouncingScrollPhysics(),
-                                    children: [
-                                      _AllTab(query: _query), // Pass query here
-                                      _RegionTab(region: Region.north, query: _query),
-                                      _RegionTab(region: Region.south, query: _query),
-                                      _RegionTab(region: Region.east, query: _query),
-                                      _RegionTab(region: Region.west, query: _query),
-                                    ],
-                                  ),
+                        child: _BodyWithProviderOrStream(
+                          query: _query,
+                          prov: prov,
+                        ),
                       ),
                     ],
                   ),
@@ -211,7 +197,120 @@ class _CategoryTabs extends StatelessWidget {
   }
 }
 
-/* -------------------- Tab content by region ------------------ */
+/* --------- เครืองยนต์: ใช้ Provider ถ้ามีข้อมูล, ไม่งั้น fallback เป็น Firestore --------- */
+
+class _BodyWithProviderOrStream extends StatelessWidget {
+  const _BodyWithProviderOrStream({required this.query, required this.prov});
+  final String query;
+  final PlaceProvider prov;
+
+  @override
+  Widget build(BuildContext context) {
+    // ถ้า Provider มีข้อมูลแล้ว → ใช้เส้นทางเดิม (เร็ว ไม่กระทบ logic อื่น)
+    final hasDataInProvider = prov.places.isNotEmpty || prov.bookmarked().isNotEmpty;
+
+    if (prov.isLoading && !hasDataInProvider) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (hasDataInProvider && prov.error == null) {
+      // ทางเดิม: ใช้ Provider + TabBarView
+      return TabBarView(
+        physics: const BouncingScrollPhysics(),
+        children: [
+          _AllTab(query: query),
+          _RegionTab(region: Region.north, query: query),
+          _RegionTab(region: Region.south, query: query),
+          _RegionTab(region: Region.east, query: query),
+          _RegionTab(region: Region.west, query: query),
+        ],
+      );
+    }
+
+    // ❗️Fallback: ใช้ Firestore realtime ถ้า Provider ว่าง/พัง (error หรือไม่มีข้อมูล)
+    final stream = FirebaseFirestore.instance
+        .collection('places')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: stream,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return Center(
+            child: Text(
+              'เกิดข้อผิดพลาด: ${snap.error}',
+              style: const TextStyle(color: Colors.white70),
+            ),
+          );
+        }
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // แปลงเอกสาร → Place แบบขั้นต่ำ (ไม่แตะ model เดิม)
+        final all = snap.data!.docs
+            .map((d) => _mapDocToPlace(d.id, d.data()))
+            .whereType<Place>()
+            .toList();
+
+        // กรองตาม query
+        final q = query.trim().toLowerCase();
+        bool matches(Place p) => q.isEmpty || p.title.toLowerCase().contains(q);
+
+        // สร้างรายการตามแท็บ (ทั้งหมด/ภูมิภาค)
+        List<Place> by(Region r) => all.where((p) => p.region == r && matches(p)).toList();
+
+        final allFiltered = all.where(matches).toList();
+
+        return TabBarView(
+          physics: const BouncingScrollPhysics(),
+          children: [
+            _GridOrEmpty(items: allFiltered, emptyText: 'ยังไม่มีข้อมูล'),
+            _GridOrEmpty(items: by(Region.north), emptyText: 'ยังไม่มีข้อมูลในหมวดนี้'),
+            _GridOrEmpty(items: by(Region.south), emptyText: 'ยังไม่มีข้อมูลในหมวดนี้'),
+            _GridOrEmpty(items: by(Region.east),  emptyText: 'ยังไม่มีข้อมูลในหมวดนี้'),
+            _GridOrEmpty(items: by(Region.west),  emptyText: 'ยังไม่มีข้อมูลในหมวดนี้'),
+          ],
+        );
+      },
+    );
+  }
+
+  // แปลง Map → Place อย่างปลอดภัย (กัน field ขาด)
+  Place? _mapDocToPlace(String id, Map<String, dynamic> m) {
+    try {
+      final regionKey = (m['region'] as String?) ?? 'north';
+      Region region;
+      switch (regionKey) {
+        case 'south': region = Region.south; break;
+        case 'east':  region = Region.east;  break;
+        case 'west':  region = Region.west;  break;
+        case 'north':
+        default:      region = Region.north;
+      }
+
+      return Place(
+        id: id,
+        userId: (m['userId'] as String?) ?? '',
+        title: (m['title'] as String?) ?? '-',
+        description: (m['description'] as String?) ?? '',
+        imageUrl: (m['imageUrl'] as String?) ?? '',
+        address: (m['address'] as String?) ?? '',
+        region: region,
+        rating: ((m['rating'] as num?)?.toDouble() ?? 0.0).clamp(0.0, 5.0),
+        popularity: (m['popularity'] as int?) ?? 0,
+        createdAt: m['createdAt'], // ถ้า model มี field นี้
+        updatedAt: m['updatedAt'],
+      );
+    } catch (_) {
+      // ถ้า map ไม่ครบ/ผิด type ให้ข้ามเอกสารนั้นไป
+      return null;
+    }
+  }
+}
+
+/* -------------------- Tab content by region (Provider path) ------------------ */
 
 class _RegionTab extends StatelessWidget {
   final Region region;
@@ -221,13 +320,13 @@ class _RegionTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rawItems = context.select<PlaceProvider, List<Place>>((p) => p.byRegion(region));
-    final rawFavs = context.select<PlaceProvider, List<Place>>((p) => p.bookmarkedByRegion(region));
+    final rawFavs  = context.select<PlaceProvider, List<Place>>((p) => p.bookmarkedByRegion(region));
 
     final q = (query ?? '').trim().toLowerCase();
     bool matches(Place p) => q.isEmpty || p.title.toLowerCase().contains(q);
 
     final items = rawItems.where(matches).toList();
-    final favs = rawFavs.where(matches).toList();
+    final favs  = rawFavs.where(matches).toList();
 
     if (items.isEmpty && favs.isEmpty) {
       return const Center(
@@ -235,65 +334,27 @@ class _RegionTab extends StatelessWidget {
       );
     }
 
-    const grid = SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      mainAxisSpacing: 14,
-      crossAxisSpacing: 14,
-      childAspectRatio: 0.78,
-    );
-
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        if (items.isNotEmpty)
-          GridView.builder(
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: grid,
-            itemCount: items.length,
-            itemBuilder: (_, i) => _PlaceCard(place: items[i]),
-          ),
-
+        if (items.isNotEmpty) _GridPlaces(items: items),
         if (favs.isNotEmpty) ...[
           const SizedBox(height: 16),
           const Row(
             children: [
-              Text(
-                "Popular",
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
-              ),
+              Text("Popular", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
               Spacer(),
             ],
           ),
           const SizedBox(height: 8),
-
-          // แถบ Popular แนวนอน (เต็มแถบ)
-          LayoutBuilder(
-            builder: (context, c) {
-              final tileWidth = c.maxWidth;
-              return SizedBox(
-                height: 110,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.zero,
-                  itemCount: favs.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, i) => SizedBox(
-                    width: tileWidth,
-                    child: _PopularTile(place: favs[i]),
-                  ),
-                ),
-              );
-            },
-          ),
+          _PopularStrip(places: favs),
         ],
       ],
     );
   }
 }
 
-/* ----------------------- All Tab (new) ----------------------- */
+/* ----------------------- All Tab (Provider path) ----------------------- */
 
 class _AllTab extends StatelessWidget {
   final String? query;
@@ -303,11 +364,10 @@ class _AllTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final prov = context.watch<PlaceProvider>();
     final q = (query ?? '').trim().toLowerCase();
-
     bool matches(Place p) => q.isEmpty || p.title.toLowerCase().contains(q);
 
     final items = prov.places.where(matches).toList();
-    final favs = prov.bookmarked().where(matches).toList();
+    final favs  = prov.bookmarked().where(matches).toList();
 
     if (items.isEmpty && favs.isEmpty) {
       return const Center(
@@ -315,59 +375,89 @@ class _AllTab extends StatelessWidget {
       );
     }
 
-    const grid = SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      mainAxisSpacing: 14,
-      crossAxisSpacing: 14,
-      childAspectRatio: 0.78,
-    );
-
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        if (items.isNotEmpty)
-          GridView.builder(
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: grid,
-            itemCount: items.length,
-            itemBuilder: (_, i) => _PlaceCard(place: items[i]),
-          ),
-
+        if (items.isNotEmpty) _GridPlaces(items: items),
         if (favs.isNotEmpty) ...[
           const SizedBox(height: 16),
           const Row(
             children: [
-              Text(
-                "Popular",
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
-              ),
+              Text("Popular", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
               Spacer(),
             ],
           ),
           const SizedBox(height: 8),
-
-          LayoutBuilder(
-            builder: (context, c) {
-              final tileWidth = c.maxWidth;
-              return SizedBox(
-                height: 110,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.zero,
-                  itemCount: favs.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, i) => SizedBox(
-                    width: tileWidth,
-                    child: _PopularTile(place: favs[i]),
-                  ),
-                ),
-              );
-            },
-          ),
+          _PopularStrip(places: favs),
         ],
       ],
+    );
+  }
+}
+
+/* ----------------------- Shared UI Pieces -------------------------- */
+
+class _GridOrEmpty extends StatelessWidget {
+  final List<Place> items;
+  final String emptyText;
+  const _GridOrEmpty({required this.items, required this.emptyText});
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return Center(child: Text(emptyText, style: const TextStyle(color: Colors.white70)));
+    }
+    return _GridPlaces(items: items);
+  }
+}
+
+class _GridPlaces extends StatelessWidget {
+  const _GridPlaces({required this.items});
+  final List<Place> items;
+
+  static const grid = SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: 2,
+    mainAxisSpacing: 14,
+    crossAxisSpacing: 14,
+    childAspectRatio: 0.78,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: EdgeInsets.zero,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: grid,
+      itemCount: items.length,
+      itemBuilder: (_, i) => _PlaceCard(place: items[i]),
+    );
+    }
+}
+
+class _PopularStrip extends StatelessWidget {
+  const _PopularStrip({required this.places});
+  final List<Place> places;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final tileWidth = c.maxWidth;
+        return SizedBox(
+          height: 110,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
+            itemCount: places.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, i) => SizedBox(
+              width: tileWidth,
+              child: _PopularTile(place: places[i]),
+            ),
+          ),
+        );
+      },
     );
   }
 }

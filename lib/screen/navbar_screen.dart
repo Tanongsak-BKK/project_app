@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:project_app/screen/addcard_screen.dart';
 import 'package:project_app/screen/history_screen.dart';
-
 import 'package:project_app/screen/home_screen.dart';
 import 'package:project_app/screen/profile_screen.dart';
 
@@ -20,19 +19,17 @@ class _NavbarScreenState extends State<NavbarScreen> {
     AddCardScreen(),
     HistoryScreen(),
     ProfileScreen(),
-   
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
-      body: SafeArea(
-        bottom: false,
-        child: IndexedStack(
-          index: _index,
-          children: _pages,
-        ),
+      // ✅ สำคัญ: อย่าให้ Scaffold หลักทับพื้นหลังของหน้า child
+      backgroundColor: Colors.transparent,
+      extendBody: true, // ให้ body ล้นใต้ bottom bar ได้
+      body: IndexedStack(
+        index: _index,
+        children: _pages,
       ),
       bottomNavigationBar: _BottomPillNav(
         index: _index,
@@ -50,10 +47,12 @@ class _BottomPillNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
+      // ✅ กันเฉพาะด้านล่าง ไม่ไปดันด้านบน
+      top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         child: SizedBox(
-          height: 70,
+          height: 20,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -95,14 +94,14 @@ class _NavIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkResponse(
       onTap: onTap,
-      radius: 28,
+      radius: 40,
       child: Icon(
         icon,
-        color: active ? const Color.fromARGB(255, 0, 0, 0) : const Color.fromARGB(179, 0, 0, 0),
+        color: active
+            ? const Color.fromARGB(255, 255, 255, 255)
+            : const Color.fromARGB(179, 255, 255, 255),
         size: 26,
       ),
     );
   }
 }
-
-
