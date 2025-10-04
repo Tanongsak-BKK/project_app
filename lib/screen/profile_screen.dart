@@ -1,4 +1,3 @@
-// lib/screen/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,6 +9,7 @@ import 'package:project_app/screen/login_screen.dart';
 import 'package:project_app/model/place.dart';
 import 'package:project_app/provider/place_provider.dart';
 import 'package:project_app/screen/detail_screen.dart';
+import 'package:project_app/screen/navbar_screen.dart'; // ✅ ใช้สำหรับปุ่มกลับบ้านผ่าน Navbar
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -121,6 +121,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  /// ✅ กลับบ้านผ่าน NavbarScreen(initialIndex: 0)
+  void _goHome(BuildContext context) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const NavbarScreen()),
+      (_) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = _auth.currentUser;
@@ -135,8 +143,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     final prov = context.watch<PlaceProvider>();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       appBar: _IgAppBar(
+        onBackTap: () => _goHome(context), // ✅ ใช้ฟังก์ชันกลับบ้าน
         titleStream: _userDocStream(user).map((e) {
           final data = e.data() ?? {};
           return (data['displayName'] ?? user.displayName ?? 'Profile').toString();
@@ -384,10 +393,15 @@ class _ProfileScreenState extends State<ProfileScreen>
 /* ======================= IG-styled Widgets ======================= */
 
 class _IgAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _IgAppBar({required this.titleStream, required this.onMenuTap});
+  const _IgAppBar({
+    required this.titleStream,
+    required this.onMenuTap,
+    required this.onBackTap, // ✅ เพิ่ม
+  });
 
   final Stream<String> titleStream;
   final VoidCallback onMenuTap;
+  final VoidCallback onBackTap; // ✅ เพิ่ม
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -398,6 +412,11 @@ class _IgAppBar extends StatelessWidget implements PreferredSizeWidget {
       centerTitle: true,
       elevation: 0,
       titleSpacing: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded),
+        onPressed: onBackTap, // ✅ กลับผ่าน NavbarScreen(initialIndex: 0)
+        tooltip: 'กลับหน้าแรก',
+      ),
       title: StreamBuilder<String>(
         stream: titleStream,
         builder: (context, snap) {
