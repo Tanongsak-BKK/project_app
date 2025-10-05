@@ -39,14 +39,17 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   /// stream เอกสารผู้ใช้ (สร้างถ้ายังไม่มี)
-  Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(User user) async* {
+  Stream<DocumentSnapshot<Map<String, dynamic>>> _userDocStream(
+    User user,
+  ) async* {
     final ref = _db.collection('users').doc(user.uid);
     final snap = await ref.get();
     if (!snap.exists) {
       await ref.set({
         'uid': user.uid,
         'email': user.email,
-        'displayName': user.displayName ?? user.email?.split('@').first ?? 'User',
+        'displayName':
+            user.displayName ?? user.email?.split('@').first ?? 'User',
         'photoUrl': user.photoURL,
         'bio': '',
         'location': '',
@@ -62,11 +65,13 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _openEditProfile(Map<String, dynamic> data) async {
     final nameCtrl = TextEditingController(
-      text: (data['displayName'] ?? _auth.currentUser?.displayName ?? '').toString(),
+      text: (data['displayName'] ?? _auth.currentUser?.displayName ?? '')
+          .toString(),
     );
     final bioCtrl = TextEditingController(text: (data['bio'] ?? '').toString());
-    final photoCtrl =
-        TextEditingController(text: (data['photoUrl'] ?? _auth.currentUser?.photoURL ?? '').toString());
+    final photoCtrl = TextEditingController(
+      text: (data['photoUrl'] ?? _auth.currentUser?.photoURL ?? '').toString(),
+    );
 
     await showModalBottomSheet(
       context: context,
@@ -110,9 +115,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                 }
               } catch (e) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')));
               }
             },
           ),
@@ -134,243 +139,331 @@ class _ProfileScreenState extends State<ProfileScreen>
     final user = _auth.currentUser;
     if (user == null) {
       return const Scaffold(
-        body: SafeArea(
-          child: Center(child: Text('ยังไม่ได้เข้าสู่ระบบ')),
-        ),
+        body: SafeArea(child: Center(child: Text('ยังไม่ได้เข้าสู่ระบบ'))),
       );
     }
 
     final prov = context.watch<PlaceProvider>();
 
-    return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
-      appBar: _IgAppBar(
-        onBackTap: () => _goHome(context), // ✅ ใช้ฟังก์ชันกลับบ้าน
-        titleStream: _userDocStream(user).map((e) {
-          final data = e.data() ?? {};
-          return (data['displayName'] ?? user.displayName ?? 'Profile').toString();
-        }),
-        onMenuTap: () async {
-          final data = (await _db.collection('users').doc(user.uid).get()).data() ?? {};
-          final selected = await showModalBottomSheet<_SettingAction>(
-            context: context,
-            backgroundColor: Colors.transparent,
-            builder: (_) => const _SettingsSheet(),
-          );
-          if (selected == _SettingAction.edit) {
-            _openEditProfile(data);
-          } else if (selected == _SettingAction.logout) {
-            try {
-              await AuthService().signOut();
-              if (!mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (_) => false,
-              );
-            } catch (e) {
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('ออกจากระบบไม่สำเร็จ: $e')),
-              );
-            }
-          }
-        },
-      ),
-
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: _userDocStream(user),
-        builder: (context, snap) {
-          if (!snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final data = snap.data!.data() ?? {};
-          final displayName =
-              (data['displayName'] ?? user.displayName ?? 'Your Name').toString();
-          final email = (data['email'] ?? user.email ?? '').toString();
-          final photo = (data['photoUrl'] ?? user.photoURL)?.toString();
-          final bio = (data['bio'] ?? '').toString();
-          final ts = data['createdAt'];
-          String since = '';
-          if (ts is Timestamp) {
-            try {
-              since = DateFormat('d MMM y').format(ts.toDate());
-            } catch (_) {}
-          }
-
-          return Column(
-            children: [
-              // ---------- Header ----------
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _StoryRing(
-                      size: 94,
-                      child: CircleAvatar(
-                        radius: 42,
-                        backgroundColor: Colors.grey.shade200,
-                        backgroundImage:
-                            (photo != null && photo.isNotEmpty) ? NetworkImage(photo) : null,
-                        child: (photo == null || photo.isEmpty)
-                            ? const Icon(Icons.person, size: 42, color: Colors.black54)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: _myPlacesStream(user.uid),
-                        builder: (context, placeSnap) {
-                          final posts = placeSnap.data?.size ?? 0;
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _Stat(number: posts, label: 'Posts'),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
+    return Stack(
+      children: [
+        // --- Background image covers whole page including appbar ---
+        Positioned.fill(
+          child: Image.asset(
+            'lib/images/white.png',
+            fit: BoxFit.cover,
+          ),
+        ),
+        // --- Main content with transparent Scaffold ---
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: PreferredSize(
+            preferredSize: const Size.fromHeight(kToolbarHeight),
+            child: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: true,
+              titleSpacing: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                onPressed: () => _goHome(context),
+                tooltip: 'กลับหน้าแรก',
               ),
-
-              // ---------- Name / Bio ----------
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(displayName,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800, fontSize: 16, height: 1.1)),
-                    if (bio.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(bio, style: const TextStyle(height: 1.25)),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Opacity(
-                        opacity: .8,
-                        child: Text(email, style: const TextStyle(fontSize: 12)),
-                      ),
+              title: StreamBuilder<String>(
+                stream: _userDocStream(user).map((e) {
+                  final data = e.data() ?? {};
+                  return (data['displayName'] ?? user.displayName ?? 'Profile')
+                      .toString();
+                }),
+                builder: (context, snap) {
+                  final t = (snap.data ?? '').trim();
+                  return Text(
+                    t.isEmpty ? 'Profile' : t,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .2,
                     ),
-                    if (since.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text('เข้าร่วมเมื่อ $since',
-                            style: const TextStyle(color: Colors.black54, fontSize: 12)),
-                      ),
-                    const SizedBox(height: 10),
+                    overflow: TextOverflow.ellipsis,
+                  );
+                },
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  onPressed: () async {
+                    final data =
+                        (await _db.collection('users').doc(user.uid).get())
+                            .data() ??
+                        {};
+                    final selected = await showModalBottomSheet<_SettingAction>(
+                      context: context,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const _SettingsSheet(),
+                    );
+                    if (selected == _SettingAction.edit) {
+                      _openEditProfile(data);
+                    } else if (selected == _SettingAction.logout) {
+                      try {
+                        await AuthService().signOut();
+                        if (!mounted) return;
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
+                          ),
+                          (_) => false,
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('ออกจากระบบไม่สำเร็จ: $e')),
+                        );
+                      }
+                    }
+                  },
+                  tooltip: 'ตั้งค่า',
+                ),
+              ],
+            ),
+          ),
+          body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: _userDocStream(user),
+            builder: (context, snap) {
+              if (!snap.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final data = snap.data!.data() ?? {};
+              final displayName =
+                  (data['displayName'] ?? user.displayName ?? 'Your Name')
+                      .toString();
+              final email = (data['email'] ?? user.email ?? '').toString();
+              final photo = (data['photoUrl'] ?? user.photoURL)?.toString();
+              final bio = (data['bio'] ?? '').toString();
+              final ts = data['createdAt'];
+              String since = '';
+              if (ts is Timestamp) {
+                try {
+                  since = DateFormat('d MMM y').format(ts.toDate());
+                } catch (_) {}
+              }
 
-                    // ปุ่มแก้ไขโปรไฟล์ (สไตล์ IG – ปุ่มขอบมน)
-                    SizedBox(
-                      height: 36,
-                      child: OutlinedButton(
-                        onPressed: () => _openEditProfile(data),
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          side: BorderSide(color: Colors.grey.shade300),
-                          foregroundColor: Colors.black,
+              return Column(
+                children: [
+                  // ---------- Header ----------
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _StoryRing(
+                          size: 94,
+                          child: CircleAvatar(
+                            radius: 42,
+                            backgroundColor: Colors.grey.shade200,
+                            backgroundImage: (photo != null && photo.isNotEmpty)
+                                ? NetworkImage(photo)
+                                : null,
+                            child: (photo == null || photo.isEmpty)
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 42,
+                                    color: Colors.black54,
+                                  )
+                                : null,
+                          ),
                         ),
-                        child: const Text('แก้ไขโปรไฟล์', style: TextStyle(fontWeight: FontWeight.w600)),
-                      ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child:
+                              StreamBuilder<
+                                QuerySnapshot<Map<String, dynamic>>
+                              >(
+                                stream: _myPlacesStream(user.uid),
+                                builder: (context, placeSnap) {
+                                  final posts = placeSnap.data?.size ?? 0;
+                                  return Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      _Stat(number: posts, label: 'Posts'),
+                                    ],
+                                  );
+                                },
+                              ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
-              const SizedBox(height: 8),
-
-              // ---------- Tabs ----------
-              TabBar(
-                controller: _tab,
-                indicatorColor: Colors.black,
-                indicatorWeight: 1.8,
-                labelColor: Colors.black,
-                unselectedLabelColor: Colors.black45,
-                tabs: const [
-                  Tab(icon: Icon(Icons.grid_on_rounded, size: 22)),
-                  Tab(icon: Icon(Icons.bookmark_border, size: 22)),
-                ],
-              ),
-
-              // ---------- Tab Views ----------
-              Expanded(
-                child: TabBarView(
-                  controller: _tab,
-                  children: [
-                    // Grid: โพสต์ของเรา
-                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: _myPlacesStream(user.uid),
-                      builder: (context, snap) {
-                        if (snap.hasError) {
-                          return const Center(child: Text('โหลดโพสต์ไม่สำเร็จ'));
-                        }
-                        if (!snap.hasData) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        final docs = snap.data!.docs;
-                        if (docs.isEmpty) {
-                          return const Center(child: Text('ยังไม่มีโพสต์'));
-                        }
-                        return GridView.builder(
-                          padding: const EdgeInsets.all(1),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            mainAxisSpacing: 1,
-                            crossAxisSpacing: 1,
+                  // ---------- Name / Bio ----------
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            height: 1.1,
                           ),
-                          itemCount: docs.length,
-                          itemBuilder: (_, i) {
-                            final d = docs[i].data();
-                            final place = Place(
-                              id: d['id'] ?? docs[i].id,
-                              userId: d['userId'] ?? '',
-                              title: d['title'] ?? '',
-                              description: d['description'] ?? '',
-                              imageUrl: d['imageUrl'] ?? '',
-                              address: d['address'] ?? '',
-                              region: _parseRegion(d['region']),
-                              rating: (d['rating'] as num?)?.toDouble() ?? 0,
-                              popularity: (d['popularity'] as num?)?.toInt() ?? 0,
-                              createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
-                              updatedAt: (d['updatedAt'] as Timestamp?)?.toDate(),
+                        ),
+                        if (bio.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              bio,
+                              style: const TextStyle(height: 1.25),
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Opacity(
+                            opacity: .8,
+                            child: Text(
+                              email,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                        if (since.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              'เข้าร่วมเมื่อ $since',
+                              style: const TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 10),
+
+                        // ปุ่มแก้ไขโปรไฟล์ (สไตล์ IG – ปุ่มขอบมน)
+                        SizedBox(
+                          height: 36,
+                          child: OutlinedButton(
+                            onPressed: () => _openEditProfile(data),
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              side: BorderSide(color: Colors.grey.shade300),
+                              foregroundColor: Colors.black,
+                            ),
+                            child: const Text(
+                              'แก้ไขโปรไฟล์',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // ---------- Tabs ----------
+                  TabBar(
+                    controller: _tab,
+                    indicatorColor: Colors.black,
+                    indicatorWeight: 1.8,
+                    labelColor: Colors.black,
+                    unselectedLabelColor: Colors.black45,
+                    tabs: const [
+                      Tab(icon: Icon(Icons.grid_on_rounded, size: 22)),
+                      Tab(icon: Icon(Icons.bookmark_border, size: 22)),
+                    ],
+                  ),
+
+                  // ---------- Tab Views ----------
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tab,
+                      children: [
+                        // Grid: โพสต์ของเรา
+                        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                          stream: _myPlacesStream(user.uid),
+                          builder: (context, snap) {
+                            if (snap.hasError) {
+                              return const Center(
+                                child: Text('โหลดโพสต์ไม่สำเร็จ'),
+                              );
+                            }
+                            if (!snap.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            final docs = snap.data!.docs;
+                            if (docs.isEmpty) {
+                              return const Center(child: Text('ยังไม่มีโพสต์'));
+                            }
+                            return GridView.builder(
+                              padding: const EdgeInsets.all(1),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    mainAxisSpacing: 1,
+                                    crossAxisSpacing: 1,
+                                  ),
+                              itemCount: docs.length,
+                              itemBuilder: (_, i) {
+                                final d = docs[i].data();
+                                final place = Place(
+                                  id: d['id'] ?? docs[i].id,
+                                  userId: d['userId'] ?? '',
+                                  title: d['title'] ?? '',
+                                  description: d['description'] ?? '',
+                                  imageUrl: d['imageUrl'] ?? '',
+                                  address: d['address'] ?? '',
+                                  region: _parseRegion(d['region']),
+                                  rating:
+                                      (d['rating'] as num?)?.toDouble() ?? 0,
+                                  popularity:
+                                      (d['popularity'] as num?)?.toInt() ?? 0,
+                                  createdAt: (d['createdAt'] as Timestamp?)
+                                      ?.toDate(),
+                                  updatedAt: (d['updatedAt'] as Timestamp?)
+                                      ?.toDate(),
+                                );
+                                return _GridTile(place: place);
+                              },
                             );
-                            return _GridTile(place: place);
                           },
-                        );
-                      },
-                    ),
+                        ),
 
-                    // Saved / Bookmarked
-                    Builder(
-                      builder: (context) {
-                        final saved = prov.bookmarked();
-                        if (saved.isEmpty) {
-                          return const Center(child: Text('ยังไม่มีที่บันทึกไว้'));
-                        }
-                        return GridView.builder(
-                          padding: const EdgeInsets.all(1),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            mainAxisSpacing: 1,
-                            crossAxisSpacing: 1,
-                          ),
-                          itemCount: saved.length,
-                          itemBuilder: (_, i) => _GridTile(place: saved[i]),
-                        );
-                      },
+                        // Saved / Bookmarked
+                        Builder(
+                          builder: (context) {
+                            final saved = prov.bookmarked();
+                            if (saved.isEmpty) {
+                              return const Center(
+                                child: Text('ยังไม่มีที่บันทึกไว้'),
+                              );
+                            }
+                            return GridView.builder(
+                              padding: const EdgeInsets.all(1),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    mainAxisSpacing: 1,
+                                    crossAxisSpacing: 1,
+                                  ),
+                              itemCount: saved.length,
+                              itemBuilder: (_, i) => _GridTile(place: saved[i]),
+                            );
+                          },
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -391,56 +484,6 @@ class _ProfileScreenState extends State<ProfileScreen>
 }
 
 /* ======================= IG-styled Widgets ======================= */
-
-class _IgAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _IgAppBar({
-    required this.titleStream,
-    required this.onMenuTap,
-    required this.onBackTap, // ✅ เพิ่ม
-  });
-
-  final Stream<String> titleStream;
-  final VoidCallback onMenuTap;
-  final VoidCallback onBackTap; // ✅ เพิ่ม
-
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
-
-  @override
-  Widget build(BuildContext context) {
-    return AppBar(
-      centerTitle: true,
-      elevation: 0,
-      titleSpacing: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded),
-        onPressed: onBackTap, // ✅ กลับผ่าน NavbarScreen(initialIndex: 0)
-        tooltip: 'กลับหน้าแรก',
-      ),
-      title: StreamBuilder<String>(
-        stream: titleStream,
-        builder: (context, snap) {
-          final t = (snap.data ?? '').trim();
-          return Text(
-            t.isEmpty ? 'Profile' : t,
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              letterSpacing: .2,
-            ),
-            overflow: TextOverflow.ellipsis,
-          );
-        },
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.settings_outlined),
-          onPressed: onMenuTap,
-          tooltip: 'ตั้งค่า',
-        ),
-      ],
-    );
-  }
-}
 
 enum _SettingAction { edit, logout }
 
@@ -470,12 +513,18 @@ class _SettingsSheet extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.edit_outlined),
-              title: const Text('แก้ไขโปรไฟล์', style: TextStyle(fontWeight: FontWeight.w600)),
+              title: const Text(
+                'แก้ไขโปรไฟล์',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               onTap: () => Navigator.pop(context, _SettingAction.edit),
             ),
             ListTile(
               leading: const Icon(Icons.logout),
-              title: const Text('ออกจากระบบ', style: TextStyle(fontWeight: FontWeight.w600)),
+              title: const Text(
+                'ออกจากระบบ',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               onTap: () => Navigator.pop(context, _SettingAction.logout),
             ),
           ],
@@ -498,12 +547,14 @@ class _StoryRing extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        gradient: SweepGradient(colors: [
-          Color(0xFFFF6A00),
-          Color(0xFFFF006A),
-          Color(0xFF7B61FF),
-          Color(0xFFFF6A00),
-        ]),
+        gradient: SweepGradient(
+          colors: [
+            Color(0xFFFF6A00),
+            Color(0xFFFF006A),
+            Color(0xFF7B61FF),
+            Color(0xFFFF6A00),
+          ],
+        ),
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -526,7 +577,10 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text('$number', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+        Text(
+          '$number',
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
+        ),
         const SizedBox(height: 2),
         Text(label, style: const TextStyle(color: Colors.black54)),
       ],
@@ -555,7 +609,8 @@ class _GridTile extends StatelessWidget {
                   key: ValueKey(place.imageUrl),
                   place.imageUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined),
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.broken_image_outlined),
                 ),
               ),
       ),
@@ -584,16 +639,16 @@ class _EditProfileSheet extends StatefulWidget {
 
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   InputDecoration _dec(String hint, IconData icon) => InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, color: Colors.black87),
-        filled: true,
-        fillColor: const Color(0xFFF6F7F9),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-      );
+    hintText: hint,
+    prefixIcon: Icon(icon, color: Colors.black87),
+    filled: true,
+    fillColor: const Color(0xFFF6F7F9),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: Colors.grey.shade300),
+    ),
+    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -615,8 +670,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text('แก้ไขโปรไฟล์',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+          const Text(
+            'แก้ไขโปรไฟล์',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+          ),
           const SizedBox(height: 12),
 
           // พรีวิวรูป
@@ -664,9 +721,14 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 backgroundColor: Colors.black,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: const Text('บันทึก', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: const Text(
+                'บันทึก',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
         ],

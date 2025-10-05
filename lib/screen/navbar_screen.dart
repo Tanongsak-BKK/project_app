@@ -98,8 +98,8 @@ class _NavIcon extends StatelessWidget {
       child: Icon(
         icon,
         color: active
-            ? const Color.fromARGB(255, 17, 128, 7)
-            : const Color.fromARGB(131, 13, 255, 0),
+            ? const Color.fromARGB(255, 255, 255, 255)
+            : const Color.fromARGB(131, 255, 255, 255),
         size: 26,
       ),
     );

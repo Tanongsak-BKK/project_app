@@ -1,8 +1,11 @@
+// lib/screen/signup_screen.dart
 import 'package:flutter/material.dart';
 import 'package:project_app/screen/login_screen.dart';
 import 'package:project_app/screen/navbar_screen.dart';
 import 'package:project_app/service/auth_service.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ✅ เพิ่มเพื่ออัปเดต displayName
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:video_player/video_player.dart';
+import 'package:flutter/services.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -25,12 +28,33 @@ class _SignupScreenState extends State<SignupScreen> {
 
   final _auth = AuthService();
 
+  late VideoPlayerController _videoCtrl;
+  bool _videoReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _initVideo();
+  }
+
+  Future<void> _initVideo() async {
+    _videoCtrl = VideoPlayerController.asset('lib/gifs/backlogin.mp4');
+    await _videoCtrl.initialize();
+    _videoCtrl
+      ..setLooping(true)
+      ..setVolume(0);
+    await _videoCtrl.play();
+    if (mounted) setState(() => _videoReady = true);
+  }
+
   @override
   void dispose() {
     _usernameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
+    _videoCtrl.dispose();
     super.dispose();
   }
 
@@ -60,13 +84,11 @@ class _SignupScreenState extends State<SignupScreen> {
 
     setState(() => _loading = true);
     try {
-      // ✅ สมัครด้วยอีเมล/รหัสผ่าน (ตาม AuthService ที่มีอยู่)
       await _auth.signUpWithEmail(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
       );
 
-      // ✅ อัปเดต displayName ให้ตรงกับ Username
       final user = FirebaseAuth.instance.currentUser;
       final name = _usernameCtrl.text.trim();
       if (user != null && name.isNotEmpty) {
@@ -78,15 +100,10 @@ class _SignupScreenState extends State<SignupScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('สมัครสมาชิกสำเร็จ')));
 
-      // หมายเหตุ: ตอนนี้ผู้ใช้ถูกล็อกอินอยู่แล้ว
-      // คุณเลือกจะ:
-      // 1) ไปหน้า Login เหมือนเดิม:
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
-      // 2) หรือจะเข้าแอปเลย:
-      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const NavbarScreen()));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -99,7 +116,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _signInWithGoogle() async {
     setState(() => _loading = true);
     try {
-      await _auth.signInWithGoogle(); // ✅ ใช้งานจริง
+      await _auth.signInWithGoogle();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('เข้าสู่ระบบด้วย Google สำเร็จ')),
@@ -120,7 +137,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _signUpWithGithub() async {
     setState(() => _loading = true);
     try {
-      await _auth.signInWithGithub(); // ✅ ใช้งานจริง (ครั้งแรกคือสมัครอัตโนมัติ)
+      await _auth.signInWithGithub();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('เข้าสู่ระบบด้วย GitHub สำเร็จ')),
@@ -138,220 +155,250 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
+  /// 🎥 พื้นหลังวิดีโอเต็มจอ
+  Widget _buildVideoBackground() {
+    if (!_videoReady) return const SizedBox.shrink();
+    return Positioned.fill(
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: _videoCtrl.value.size.width,
+          height: _videoCtrl.value.size.height,
+          child: AspectRatio(
+            aspectRatio: _videoCtrl.value.aspectRatio,
+            child: VideoPlayer(_videoCtrl),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ... (โค้ด UI เดิมทั้งหมดของคุณ ด้านล่างเหมือนเดิมไม่ต้องแก้)
-    return Scaffold(
-      body: Stack(
-        children: <Widget>[
-          // BG gradient
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color.fromARGB(255, 0, 71, 154),
-                  Color.fromARGB(255, 3, 136, 154),
-                  Color.fromARGB(255, 19, 238, 154),
-                ],
-                stops: [0.1, 0.4, 0.8],
-              ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            _buildVideoBackground(),
+            Positioned.fill(
+              child: Container(color: Colors.black.withOpacity(0.45)),
             ),
-          ),
-          // เนื้อหาเดิม…
-          // (วาง UI เดิมของคุณตามไฟล์ที่ส่งมาได้เลย — ไม่มีแก้สไตล์/โครงอะไรเพิ่มเติม)
-          SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 120.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: <Widget>[
-                  const Text(
-                    'Sign Up',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'OpenSans',
-                      fontSize: 30.0,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 30.0),
-                  _buildLabel("Username"),
-                  _FieldBox(
-                    child: TextFormField(
-                      controller: _usernameCtrl,
-                      textInputAction: TextInputAction.next,
-                      autofocus: true,
-                      decoration: _inputDec(hint: 'Enter your Username', icon: Icons.person),
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Please enter username'
-                          : (v.trim().length < 3 ? 'Username must be at least 3 chars' : null),
-                    ),
-                  ),
-                  const SizedBox(height: 10.0),
-                  _buildLabel("Email"),
-                  _FieldBox(
-                    child: TextFormField(
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      decoration: _inputDec(hint: 'Enter your Email', icon: Icons.email),
-                      validator: (v) {
-                        final value = v?.trim() ?? '';
-                        if (value.isEmpty) return 'Please enter email';
-                        final emailRegex = RegExp(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$");
-                        if (!emailRegex.hasMatch(value)) return 'Invalid email';
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 10.0),
-                  _buildLabel("Password"),
-                  _FieldBox(
-                    child: TextFormField(
-                      controller: _passwordCtrl,
-                      obscureText: _obscure1,
-                      decoration: _inputDec(hint: 'Enter your Password', icon: Icons.lock).copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(_obscure1 ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () => setState(() => _obscure1 = !_obscure1),
-                        ),
-                      ),
-                      validator: (v) => (v == null || v.length < 6) ? 'Password must be at least 6 chars' : null,
-                    ),
-                  ),
-                  const SizedBox(height: 10.0),
-                  _buildLabel("Confirm Password"),
-                  _FieldBox(
-                    child: TextFormField(
-                      controller: _confirmCtrl,
-                      obscureText: _obscure2,
-                      decoration: _inputDec(hint: 'Re-enter your Password', icon: Icons.lock_outline).copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(_obscure2 ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () => setState(() => _obscure2 = !_obscure2),
-                        ),
-                      ),
-                      validator: (v) => (v != _passwordCtrl.text) ? 'Passwords do not match' : null,
-                    ),
-                  ),
-                  const SizedBox(height: 10.0),
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: _agreeTos,
-                        onChanged: (v) => setState(() => _agreeTos = v ?? false),
-                        activeColor: Colors.white,
-                        checkColor: const Color.fromARGB(255, 0, 71, 154),
-                      ),
-                      const Expanded(
-                        child: Text(
-                          'I agree to the Terms of Service and Privacy Policy',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10.0),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : _onEmailSignup,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 0, 71, 154),
-                        padding: const EdgeInsets.all(15.0),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
-                      ),
-                      child: _loading
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
-                            )
-                          : const Text(
-                              'SIGN UP',
-                              style: TextStyle(
-                                color: Colors.white,
-                                letterSpacing: 1.5,
-                                fontSize: 18.0,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'OpenSans',
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: const [
-                      Expanded(child: Divider(color: Colors.white70)),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10.0),
-                        child: Text('or sign up with', style: TextStyle(color: Colors.white70)),
-                      ),
-                      Expanded(child: Divider(color: Colors.white70)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      _SsoButton(
-                        label: 'Google',
-                        icon: Icons.g_mobiledata,
-                        onTap: _loading ? null : _signInWithGoogle, // ✅ ใช้ฟังก์ชันจริง
-                        background: Colors.white,
-                        foreground: Colors.black87,
-                      ),
-                      _SsoButton(
-                        label: 'GitHub',
-                        icon: Icons.code,
-                        onTap: _loading ? null : _signUpWithGithub, // ✅ ใช้ฟังก์ชันจริง
-                        background: Colors.black,
-                        foreground: Colors.white,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24.0),
-                  TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (_) => const LoginScreen()),
-                            );
-                          },
-                    child: const Text(
-                      'Already have an account? Sign In',
+            SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 120.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: <Widget>[
+                    const Text(
+                      'Sign Up',
                       style: TextStyle(
                         color: Colors.white,
                         fontFamily: 'OpenSans',
-                        fontSize: 14.0,
+                        fontSize: 30.0,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 30.0),
+
+                    _buildLabel("Username"),
+                    _FieldBox(
+                      child: TextFormField(
+                        controller: _usernameCtrl,
+                        textInputAction: TextInputAction.next,
+                        autofocus: true,
+                        decoration: _inputDec(hint: 'Enter your Username', icon: Icons.person),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Please enter username'
+                            : (v.trim().length < 3 ? 'Username must be at least 3 chars' : null),
+                      ),
+                    ),
+                    const SizedBox(height: 10.0),
+
+                    _buildLabel("Email"),
+                    _FieldBox(
+                      child: TextFormField(
+                        controller: _emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        decoration: _inputDec(hint: 'Enter your Email', icon: Icons.email),
+                        validator: (v) {
+                          final value = v?.trim() ?? '';
+                          if (value.isEmpty) return 'Please enter email';
+                          final emailRegex = RegExp(r'^.+@.+\..+$');
+                          if (!emailRegex.hasMatch(value)) return 'Invalid email';
+                          return null;
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 10.0),
+                    _buildLabel("Password"),
+                    _FieldBox(
+                      child: TextFormField(
+                        controller: _passwordCtrl,
+                        obscureText: _obscure1,
+                        decoration: _inputDec(
+                          hint: 'Enter your Password',
+                          icon: Icons.lock,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscure1 ? Icons.visibility : Icons.visibility_off),
+                            onPressed: () => setState(() => _obscure1 = !_obscure1),
+                          ),
+                        ),
+                        validator: (v) =>
+                            (v == null || v.length < 6) ? 'Password must be at least 6 chars' : null,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10.0),
+                    _buildLabel("Confirm Password"),
+                    _FieldBox(
+                      child: TextFormField(
+                        controller: _confirmCtrl,
+                        obscureText: _obscure2,
+                        decoration: _inputDec(
+                          hint: 'Re-enter your Password',
+                          icon: Icons.lock_outline,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscure2 ? Icons.visibility : Icons.visibility_off),
+                            onPressed: () => setState(() => _obscure2 = !_obscure2),
+                          ),
+                        ),
+                        validator: (v) =>
+                            (v != _passwordCtrl.text) ? 'Passwords do not match' : null,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10.0),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _agreeTos,
+                          onChanged: (v) => setState(() => _agreeTos = v ?? false),
+                          activeColor: Colors.white,
+                          checkColor: const Color.fromARGB(255, 0, 71, 154),
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'I agree to the Terms of Service and Privacy Policy',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 10.0),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _loading ? null : _onEmailSignup,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color.fromARGB(255, 0, 71, 154),
+                          padding: const EdgeInsets.all(15.0),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
+                        ),
+                        child: _loading
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation(Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                'SIGN UP',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  letterSpacing: 1.5,
+                                  fontSize: 18.0,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'OpenSans',
+                                ),
+                              ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+                    Row(
+                      children: const [
+                        Expanded(child: Divider(color: Colors.white70)),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10.0),
+                          child: Text('or sign up with', style: TextStyle(color: Colors.white70)),
+                        ),
+                        Expanded(child: Divider(color: Colors.white70)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _SsoButton(
+                          label: 'Google',
+                          icon: Icons.g_mobiledata,
+                          onTap: _loading ? null : _signInWithGoogle,
+                          background: Colors.white,
+                          foreground: Colors.black87,
+                        ),
+                        _SsoButton(
+                          label: 'GitHub',
+                          icon: Icons.code,
+                          onTap: _loading ? null : _signUpWithGithub,
+                          background: Colors.black,
+                          foreground: Colors.white,
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24.0),
+                    TextButton(
+                      onPressed: _loading
+                          ? null
+                          : () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                              );
+                            },
+                      child: const Text(
+                        'Already have an account? Sign In',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'OpenSans',
+                          fontSize: 14.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          SafeArea(
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              },
+            SafeArea(
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

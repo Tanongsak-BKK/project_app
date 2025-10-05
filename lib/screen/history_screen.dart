@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:project_app/model/place.dart';
 import 'package:project_app/provider/place_provider.dart';
 import 'package:project_app/screen/detail_screen.dart';
+import 'package:project_app/screen/navbar_screen.dart'; // ✅ เพิ่ม
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -24,36 +25,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     // ให้แน่ใจว่า provider มีรายการสถานที่ไว้ค้นชื่อ/รูปสำหรับกิจกรรม
     Future.microtask(() => context.read<PlaceProvider>().loadPlaces());
   }
-
-  // ---------- (เดิม) ลบ place ของฉัน ----------
-  Future<void> _deletePlace(BuildContext context, Place place) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ลบรายการนี้?'),
-        content: Text('คุณต้องการลบ “${place.title}” จริงหรือไม่'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ลบ')),
-        ],
-      ),
+  
+  /// ✅ ปุ่มกลับบ้านผ่าน NavbarScreen(initialIndex: 0)
+  void _goHome() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const NavbarScreen()),
+      (_) => false,
     );
-    if (confirm != true) return;
-
-    setState(() => _busy = true);
-    try {
-      await FirebaseFirestore.instance.collection('places').doc(place.id).delete();
-      if (mounted) {
-        context.read<PlaceProvider>().removeById(place.id);
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ลบเรียบร้อย')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ลบไม่สำเร็จ: $e')));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   @override
@@ -63,6 +41,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('การแจ้งเตือนล่าสุด'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: _goHome, // ✅ กลับบ้าน
+          tooltip: 'กลับหน้าแรก',
+        ),
         actions: [
           if (_busy)
             const Padding(
@@ -160,7 +143,10 @@ class _ActivityTile extends StatelessWidget {
           );
         }
       },
-      leading: _LeadingThumb(thumbUrl: thumb, fallbackIcon: isRating ? Icons.star_rate_rounded : Icons.comment_rounded),
+      leading: _LeadingThumb(
+        thumbUrl: thumb,
+        fallbackIcon: isRating ? Icons.star_rate_rounded : Icons.comment_rounded,
+      ),
       title: Text(
         '$displayName ${isRating ? "ให้คะแนน" : "แสดงความคิดเห็น"}',
         maxLines: 1,
@@ -170,10 +156,8 @@ class _ActivityTile extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // เนื้อความกิจกรรม
           if (message.isNotEmpty)
             Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
-          // แสดงว่ามาจากการ์ดไหน
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Row(
@@ -211,7 +195,10 @@ class _LeadingThumb extends StatelessWidget {
     if (thumbUrl.isEmpty) {
       return CircleAvatar(
         backgroundColor: Colors.black12,
-        child: Icon(fallbackIcon, color: fallbackIcon == Icons.star_rate_rounded ? Colors.orangeAccent : Colors.blueAccent),
+        child: Icon(
+          fallbackIcon,
+          color: fallbackIcon == Icons.star_rate_rounded ? Colors.orangeAccent : Colors.blueAccent,
+        ),
       );
     }
     return ClipRRect(
@@ -223,79 +210,12 @@ class _LeadingThumb extends StatelessWidget {
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => CircleAvatar(
           backgroundColor: Colors.black12,
-          child: Icon(fallbackIcon, color: fallbackIcon == Icons.star_rate_rounded ? Colors.orangeAccent : Colors.blueAccent),
+          child: Icon(
+            fallbackIcon,
+            color: fallbackIcon == Icons.star_rate_rounded ? Colors.orangeAccent : Colors.blueAccent,
+          ),
         ),
       ),
-    );
-    }
-}
-
-/* ------------------- (ของเดิม) My Places list ------------------- */
-/* ถ้าคุณยังต้องการหน้ารายการสถานที่ของฉันแบบเดิม
-   สามารถเก็บ _MyPlacesList ด้านล่างไว้ใช้งานที่อื่นได้ */
-
-class _MyPlacesList extends StatelessWidget {
-  final List<Place> items;
-  final bool busy;
-  final ValueChanged<Place> onDelete;
-  const _MyPlacesList({required this.items, required this.busy, required this.onDelete});
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const Center(child: Text('ยังไม่มีรายการของคุณ'));
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (_, i) {
-        final p = items[i];
-        return Material(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                p.imageUrl,
-                width: 64,
-                height: 64,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 64,
-                  height: 64,
-                  color: Colors.black12,
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.image_not_supported, color: Colors.black45),
-                ),
-              ),
-            ),
-            title: Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: Row(
-              children: [
-                const Icon(Icons.star, color: Color(0xFFFFD166), size: 16),
-                const SizedBox(width: 4),
-                Text(p.rating.toStringAsFixed(1)),
-              ],
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => DetailScreen(place: p)),
-              );
-            },
-            trailing: IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: busy ? null : () => onDelete(p),
-              tooltip: 'ลบ',
-            ),
-          ),
-        );
-      },
     );
   }
 }
