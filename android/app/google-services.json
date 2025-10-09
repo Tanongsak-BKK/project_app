@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "928270258852",
+    "firebase_url": "https://tarvelapp-ed9e7-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "tarvelapp-ed9e7",
+    "storage_bucket": "tarvelapp-ed9e7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:928270258852:android:88bf7ce93264523da64c31",
+        "android_client_info": {
+          "package_name": "com.tarvel.project_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "928270258852-anqqtbd29fm6sqdv5veqtnbtt6bgd6k0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOST62YOhx-evm6t8b_zq5Y524vJ6XBSE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "928270258852-anqqtbd29fm6sqdv5veqtnbtt6bgd6k0.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "928270258852-eqt7h36o7f160h9qt3ocmrr3v0no32sp.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.projectApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

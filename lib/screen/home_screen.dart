@@ -1,10 +1,17 @@
-// lib/screen/home_screen.dart 
+// lib/screen/home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:project_app/model/place.dart'; // ต้องมี enum Region และ class Place
 import 'package:project_app/provider/place_provider.dart';
 import 'package:project_app/screen/detail_screen.dart';
+
+/* ---------------------- Top-level constants ---------------------- */
+const kCard = Color(0xFF151517);
+const kField = Color(0xFF1A1B1F);
+const kAccent = Color(0xFF2F80ED);
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // โหลดจาก Provider ตามเดิม
     Future.microtask(() => context.read<PlaceProvider>().loadPlaces());
   }
 
@@ -29,126 +37,131 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  static const _card = Color(0xFF151517);
-  static const _field = Color(0xFF1A1B1F);
-  static const _accent = Color(0xFF2F80ED);
-
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<PlaceProvider>();
     final theme = Theme.of(context);
+    final topPad = MediaQuery.of(context).padding.top;
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("lib/images/background-onboarding.jpg"),
-            fit: BoxFit.cover,
-            alignment: Alignment.topCenter,
-          ),
-        ),
-        child: SafeArea(
-          child: DefaultTabController(
-            length: 5, // ← มี 5 แท็บ: ทั้งหมด + 4 ภูมิภาค
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Row(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light, // Android
+        statusBarBrightness: Brightness.dark,      // iOS (light content)
+        systemNavigationBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        extendBody: true,
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 🔹 พื้นหลังรูปเต็มจอ
+            const Positioned.fill(
+              child: Image(
+                image: AssetImage("lib/images/background-onboarding.jpg"),
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+            // 🔹 Overlay ให้อ่านข้อความชัด
+            Positioned.fill(
+              child: Container(color: Colors.black.withOpacity(0.25)),
+            ),
+
+            // 🔹 เนื้อหา
+            SafeArea(
+              top: false,
+              child: DefaultTabController(
+                length: 5, // ทั้งหมด + 4 ภูมิภาค
+                child: Padding(
+                  // ชดเชยรอยบากเอง เพื่อให้หัวชนภาพ
+                  padding: EdgeInsets.fromLTRB(16, topPad + 12, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Opacity(
-                              opacity: .7,
-                              child: Text(
-                                "You're in New York",
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: const Color.fromARGB(179, 0, 0, 0),
+                      // Header
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Opacity(
+                                  opacity: .7,
+                                  child: Text(
+                                    "You're in Thailand",
+                                    style: theme.textTheme.labelMedium?.copyWith(
+                                      color: const Color.fromARGB(179, 255, 255, 255),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  "Let's explore!",
+                                  style: theme.textTheme.headlineSmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              "Let's explore!",
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Search
+                      TextField(
+                        controller: _searchCtrl,
+                        style: const TextStyle(color: Colors.white),
+                        cursorColor: Colors.white70,
+                        decoration: InputDecoration(
+                          hintText: "ค้นหาชื่อสถานที่…",
+                          hintStyle: const TextStyle(color: Colors.white54),
+                          filled: true,
+                          fillColor: kField,
+                          prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                          suffixIcon: (_query.isEmpty)
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white70),
+                                  onPressed: () {
+                                    _searchCtrl.clear();
+                                    setState(() => _query = '');
+                                  },
+                                ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onChanged: (q) => setState(() => _query = q.trim()),
+                        onSubmitted: (q) => setState(() => _query = q.trim()),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // Tabs
+                      const _CategoryTabs(),
+                      const SizedBox(height: 12),
+
+                      // เนื้อหาแท็บ
+                      Expanded(
+                        child: _BodyWithProviderOrStream(
+                          query: _query,
+                          prov: prov,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-
-                  // Search
-                  TextField(
-                    controller: _searchCtrl,
-                    style: const TextStyle(color: Colors.white),
-                    cursorColor: Colors.white70,
-                    decoration: InputDecoration(
-                      hintText: "ค้นหาชื่อสถานที่…",
-                      hintStyle: const TextStyle(color: Colors.white54),
-                      filled: true,
-                      fillColor: _field,
-                      prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                      suffixIcon: (_query.isEmpty)
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.close, color: Colors.white70),
-                              onPressed: () {
-                                _searchCtrl.clear();
-                                setState(() => _query = '');
-                              },
-                            ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onChanged: (q) => setState(() => _query = q.trim()),
-                    onSubmitted: (q) => setState(() => _query = q.trim()),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // Tabs
-                  const _CategoryTabs(),
-                  const SizedBox(height: 12),
-
-                  // เนื้อหาแท็บ
-                  Expanded(
-                    child: prov.isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : prov.error != null
-                            ? Center(
-                                child: Text(
-                                  prov.error!,
-                                  style: const TextStyle(color: Colors.white70),
-                                ),
-                              )
-                            : TabBarView(
-                                physics: const BouncingScrollPhysics(),
-                                children: [
-                                  // ← เพิ่มแท็บ "ทั้งหมด" หน้าแรก
-                                  _AllTab(query: _query),
-                                  _RegionTab(region: Region.north, query: _query),
-                                  _RegionTab(region: Region.south, query: _query),
-                                  _RegionTab(region: Region.east,  query: _query),
-                                  _RegionTab(region: Region.west,  query: _query),
-                                ],
-                              ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -162,19 +175,19 @@ class _CategoryTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TabBar(
+    return const TabBar(
       isScrollable: true,
       dividerColor: Colors.transparent,
       indicatorSize: TabBarIndicatorSize.label,
       labelColor: Colors.white,
       unselectedLabelColor: Colors.white60,
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-      indicator: const UnderlineTabIndicator(
-        borderSide: BorderSide(width: 3, color: _HomeScreenState._accent),
+      labelStyle: TextStyle(fontWeight: FontWeight.w700),
+      indicator: UnderlineTabIndicator(
+        borderSide: BorderSide(width: 3, color: kAccent),
         insets: EdgeInsets.symmetric(horizontal: 8),
       ),
-      tabs: const [
-        Tab(text: 'ทั้งหมด'), // ← เพิ่มแท็บรวมทั้งหมด
+      tabs: [
+        Tab(text: 'ทั้งหมด'),
         Tab(text: 'เหนือ'),
         Tab(text: 'ใต้'),
         Tab(text: 'ตะวันออก'),
@@ -184,169 +197,267 @@ class _CategoryTabs extends StatelessWidget {
   }
 }
 
-/* -------------------- Tab content by region ------------------ */
+/* --------- เครืองยนต์: ใช้ Provider ถ้ามีข้อมูล, ไม่งั้น fallback เป็น Firestore --------- */
 
-class _RegionTab extends StatelessWidget {
-  final Region region;
+class _BodyWithProviderOrStream extends StatelessWidget {
+  const _BodyWithProviderOrStream({required this.query, required this.prov});
   final String query;
-  const _RegionTab({required this.region, required this.query});
+  final PlaceProvider prov;
 
   @override
   Widget build(BuildContext context) {
-    final rawItems = context.select<PlaceProvider, List<Place>>(
-      (p) => p.byRegion(region),
-    );
-    final rawFavs = context.select<PlaceProvider, List<Place>>(
-      (p) => p.bookmarkedByRegion(region),
-    );
+    // ถ้า Provider มีข้อมูลแล้ว → ใช้เส้นทางเดิม (เร็ว ไม่กระทบ logic อื่น)
+    final hasDataInProvider = prov.places.isNotEmpty || prov.bookmarked().isNotEmpty;
 
-    final q = query.trim().toLowerCase();
+    if (prov.isLoading && !hasDataInProvider) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (hasDataInProvider && prov.error == null) {
+      // ทางเดิม: ใช้ Provider + TabBarView
+      return TabBarView(
+        physics: const BouncingScrollPhysics(),
+        children: [
+          _AllTab(query: query),
+          _RegionTab(region: Region.north, query: query),
+          _RegionTab(region: Region.south, query: query),
+          _RegionTab(region: Region.east, query: query),
+          _RegionTab(region: Region.west, query: query),
+        ],
+      );
+    }
+
+    // ❗️Fallback: ใช้ Firestore realtime ถ้า Provider ว่าง/พัง (error หรือไม่มีข้อมูล)
+    final stream = FirebaseFirestore.instance
+        .collection('places')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: stream,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return Center(
+            child: Text(
+              'เกิดข้อผิดพลาด: ${snap.error}',
+              style: const TextStyle(color: Colors.white70),
+            ),
+          );
+        }
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // แปลงเอกสาร → Place แบบขั้นต่ำ (ไม่แตะ model เดิม)
+        final all = snap.data!.docs
+            .map((d) => _mapDocToPlace(d.id, d.data()))
+            .whereType<Place>()
+            .toList();
+
+        // กรองตาม query
+        final q = query.trim().toLowerCase();
+        bool matches(Place p) => q.isEmpty || p.title.toLowerCase().contains(q);
+
+        // สร้างรายการตามแท็บ (ทั้งหมด/ภูมิภาค)
+        List<Place> by(Region r) => all.where((p) => p.region == r && matches(p)).toList();
+
+        final allFiltered = all.where(matches).toList();
+
+        return TabBarView(
+          physics: const BouncingScrollPhysics(),
+          children: [
+            _GridOrEmpty(items: allFiltered, emptyText: 'ยังไม่มีข้อมูล'),
+            _GridOrEmpty(items: by(Region.north), emptyText: 'ยังไม่มีข้อมูลในหมวดนี้'),
+            _GridOrEmpty(items: by(Region.south), emptyText: 'ยังไม่มีข้อมูลในหมวดนี้'),
+            _GridOrEmpty(items: by(Region.east),  emptyText: 'ยังไม่มีข้อมูลในหมวดนี้'),
+            _GridOrEmpty(items: by(Region.west),  emptyText: 'ยังไม่มีข้อมูลในหมวดนี้'),
+          ],
+        );
+      },
+    );
+  }
+
+  // แปลง Map → Place อย่างปลอดภัย (กัน field ขาด)
+  Place? _mapDocToPlace(String id, Map<String, dynamic> m) {
+    try {
+      final regionKey = (m['region'] as String?) ?? 'north';
+      Region region;
+      switch (regionKey) {
+        case 'south': region = Region.south; break;
+        case 'east':  region = Region.east;  break;
+        case 'west':  region = Region.west;  break;
+        case 'north':
+        default:      region = Region.north;
+      }
+
+      return Place(
+        id: id,
+        userId: (m['userId'] as String?) ?? '',
+        title: (m['title'] as String?) ?? '-',
+        description: (m['description'] as String?) ?? '',
+        imageUrl: (m['imageUrl'] as String?) ?? '',
+        address: (m['address'] as String?) ?? '',
+        region: region,
+        rating: ((m['rating'] as num?)?.toDouble() ?? 0.0).clamp(0.0, 5.0),
+        popularity: (m['popularity'] as int?) ?? 0,
+        createdAt: m['createdAt'], // ถ้า model มี field นี้
+        updatedAt: m['updatedAt'],
+      );
+    } catch (_) {
+      // ถ้า map ไม่ครบ/ผิด type ให้ข้ามเอกสารนั้นไป
+      return null;
+    }
+  }
+}
+
+/* -------------------- Tab content by region (Provider path) ------------------ */
+
+class _RegionTab extends StatelessWidget {
+  final Region region;
+  final String? query;
+  const _RegionTab({required this.region, this.query});
+
+  @override
+  Widget build(BuildContext context) {
+    final rawItems = context.select<PlaceProvider, List<Place>>((p) => p.byRegion(region));
+    final rawFavs  = context.select<PlaceProvider, List<Place>>((p) => p.bookmarkedByRegion(region));
+
+    final q = (query ?? '').trim().toLowerCase();
     bool matches(Place p) => q.isEmpty || p.title.toLowerCase().contains(q);
 
     final items = rawItems.where(matches).toList();
     final favs  = rawFavs.where(matches).toList();
 
     if (items.isEmpty && favs.isEmpty) {
-      return Center(
-        child: Text(
-          q.isEmpty ? 'ยังไม่มีข้อมูลในหมวดนี้' : 'ไม่พบผลลัพธ์สำหรับ “$query”',
-          style: const TextStyle(color: Colors.white70),
-        ),
+      return const Center(
+        child: Text('ยังไม่มีข้อมูลในหมวดนี้', style: TextStyle(color: Colors.white70)),
       );
     }
-
-    const grid = SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      mainAxisSpacing: 14,
-      crossAxisSpacing: 14,
-      childAspectRatio: 0.78,
-    );
 
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        if (items.isNotEmpty)
-          GridView.builder(
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: grid,
-            itemCount: items.length,
-            itemBuilder: (_, i) => _PlaceCard(place: items[i]),
-          ),
-
+        if (items.isNotEmpty) _GridPlaces(items: items),
         if (favs.isNotEmpty) ...[
           const SizedBox(height: 16),
           const Row(
             children: [
-              Text("Popular",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+              Text("Popular", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
               Spacer(),
             ],
           ),
           const SizedBox(height: 8),
-
-          // แถบ Popular แนวนอน (เต็มแถบ)
-          LayoutBuilder(
-            builder: (context, c) {
-              final tileWidth = c.maxWidth;
-              return SizedBox(
-                height: 110,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.zero,
-                  itemCount: favs.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, i) => SizedBox(
-                    width: tileWidth,
-                    child: _PopularTile(place: favs[i]),
-                  ),
-                ),
-              );
-            },
-          ),
+          _PopularStrip(places: favs),
         ],
       ],
     );
   }
 }
 
-/* ----------------------- All Tab (new) ----------------------- */
+/* ----------------------- All Tab (Provider path) ----------------------- */
 
 class _AllTab extends StatelessWidget {
-  final String query;
-  const _AllTab({required this.query});
+  final String? query;
+  const _AllTab({this.query});
 
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<PlaceProvider>();
-    final q = query.trim().toLowerCase();
-
+    final q = (query ?? '').trim().toLowerCase();
     bool matches(Place p) => q.isEmpty || p.title.toLowerCase().contains(q);
 
     final items = prov.places.where(matches).toList();
     final favs  = prov.bookmarked().where(matches).toList();
 
     if (items.isEmpty && favs.isEmpty) {
-      return Center(
-        child: Text(
-          q.isEmpty ? 'ยังไม่มีข้อมูล' : 'ไม่พบผลลัพธ์สำหรับ “$query”',
-          style: const TextStyle(color: Colors.white70),
-        ),
+      return const Center(
+        child: Text('ยังไม่มีข้อมูล', style: TextStyle(color: Colors.white70)),
       );
     }
-
-    const grid = SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      mainAxisSpacing: 14,
-      crossAxisSpacing: 14,
-      childAspectRatio: 0.78,
-    );
 
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        if (items.isNotEmpty)
-          GridView.builder(
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: grid,
-            itemCount: items.length,
-            itemBuilder: (_, i) => _PlaceCard(place: items[i]),
-          ),
-
+        if (items.isNotEmpty) _GridPlaces(items: items),
         if (favs.isNotEmpty) ...[
           const SizedBox(height: 16),
           const Row(
             children: [
-              Text("Popular",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+              Text("Popular", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
               Spacer(),
             ],
           ),
           const SizedBox(height: 8),
-
-          LayoutBuilder(
-            builder: (context, c) {
-              final tileWidth = c.maxWidth;
-              return SizedBox(
-                height: 110,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.zero,
-                  itemCount: favs.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, i) => SizedBox(
-                    width: tileWidth,
-                    child: _PopularTile(place: favs[i]),
-                  ),
-                ),
-              );
-            },
-          ),
+          _PopularStrip(places: favs),
         ],
       ],
+    );
+  }
+}
+
+/* ----------------------- Shared UI Pieces -------------------------- */
+
+class _GridOrEmpty extends StatelessWidget {
+  final List<Place> items;
+  final String emptyText;
+  const _GridOrEmpty({required this.items, required this.emptyText});
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return Center(child: Text(emptyText, style: const TextStyle(color: Colors.white70)));
+    }
+    return _GridPlaces(items: items);
+  }
+}
+
+class _GridPlaces extends StatelessWidget {
+  const _GridPlaces({required this.items});
+  final List<Place> items;
+
+  static const grid = SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: 2,
+    mainAxisSpacing: 14,
+    crossAxisSpacing: 14,
+    childAspectRatio: 0.78,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: EdgeInsets.zero,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: grid,
+      itemCount: items.length,
+      itemBuilder: (_, i) => _PlaceCard(place: items[i]),
+    );
+    }
+}
+
+class _PopularStrip extends StatelessWidget {
+  const _PopularStrip({required this.places});
+  final List<Place> places;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final tileWidth = c.maxWidth;
+        return SizedBox(
+          height: 110,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
+            itemCount: places.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (_, i) => SizedBox(
+              width: tileWidth,
+              child: _PopularTile(place: places[i]),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -385,7 +496,8 @@ class _PlaceCard extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                     colors: [Colors.transparent, Colors.transparent, Colors.black54],
                   ),
                 ),
@@ -394,7 +506,9 @@ class _PlaceCard extends StatelessWidget {
           ),
           // ข้อความ
           Positioned(
-            left: 12, right: 12, bottom: 12,
+            left: 12,
+            right: 12,
+            bottom: 12,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -402,9 +516,14 @@ class _PlaceCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   place.title,
-                  maxLines: 2, overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16, height: 1.15),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    height: 1.15,
+                  ),
                 ),
               ],
             ),
@@ -415,15 +534,21 @@ class _PlaceCard extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => DetailScreen(place: place))),
+                  context,
+                  MaterialPageRoute(builder: (_) => DetailScreen(place: place)),
+                ),
               ),
             ),
           ),
-          // ปุ่มบุ๊กมาร์ก (อยู่บนสุด)
+          // ปุ่มบุ๊กมาร์ก
           Positioned(
-            top: 10, right: 10,
+            top: 10,
+            right: 10,
             child: Container(
-              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.all(6),
@@ -454,16 +579,15 @@ class _PopularTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: _HomeScreenState._card,
+      color: kCard,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _openDetail(context), // แตะทั้งแถบไป detail
+        onTap: () => _openDetail(context),
         child: SizedBox(
-          height: 110, // ให้ตรงกับส่วนที่กำหนดใน ListView
+          height: 110,
           child: Row(
             children: [
-              // รูปซ้ายเต็มช่อง
               ClipRRect(
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(14),
@@ -483,10 +607,7 @@ class _PopularTile extends StatelessWidget {
                   ),
                 ),
               ),
-
               const SizedBox(width: 12),
-
-              // ข้อความ
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
@@ -498,8 +619,7 @@ class _PopularTile extends StatelessWidget {
                         place.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w800),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -516,8 +636,6 @@ class _PopularTile extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // ลูกศร -> ไปหน้า detail เหมือนกัน
               IconButton(
                 icon: const Icon(Icons.chevron_right, color: Colors.white70),
                 onPressed: () => _openDetail(context),
@@ -542,8 +660,11 @@ class _Stars extends StatelessWidget {
     return Row(
       children: [
         ...List.generate(5, (i) {
-          if (i < full) return const Icon(Icons.star, size: 16, color: Color(0xFFFFD166));
-          if (i == full && half) return const Icon(Icons.star_half, size: 16, color: Color(0xFFFFD166));
+          if (i < full) {
+            return const Icon(Icons.star, size: 16, color: Color(0xFFFFD166));
+          } else if (i == full && half) {
+            return const Icon(Icons.star_half, size: 16, color: Color(0xFFFFD166));
+          }
           return const Icon(Icons.star_border, size: 16, color: Color(0xFFFFD166));
         }),
         const SizedBox(width: 6),
